@@ -3,16 +3,10 @@ import {
   Activity,
   Building2,
   ChevronDown,
-  Code,
-  FileText,
-  GitCompareArrows,
   Home,
   Layers,
-  MessageSquare,
-  Play,
   Sparkles,
   Star,
-  Users,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -22,23 +16,17 @@ import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceView =
+  | "actions"
   | "overview"
   | "brands"
   | "domains"
-  | "markets"
-  | "owned"
-  | "earned"
-  | "studio-articles"
-  | "studio-comparisons"
-  | "studio-outreach"
-  | "studio-community"
-  | "studio-code"
-  | "studio-videos";
+  | "markets";
 
 type Props = {
   company: CompanyOut;
   actions: ActionOut[];
   current: WorkspaceView;
+  completed: Set<string>;
   onChange: (v: WorkspaceView) => void;
   onReset: () => void;
 };
@@ -106,28 +94,14 @@ export default function Sidebar({
   company,
   actions,
   current,
+  completed,
   onChange,
   onReset,
 }: Props) {
-  const owned = actions.filter((a) => a.category === "owned_media");
-  const earned = actions.filter((a) => a.category === "earned_media");
-  const ownedHigh = owned.filter((a) => a.opportunity === "high").length;
-  const earnedHigh = earned.filter((a) => a.opportunity === "high").length;
-
-  // Studio buckets — group action kinds into the Studio sections
-  const articles = actions.filter((a) =>
-    ["article", "listicle"].includes(a.kind),
-  );
-  const comparisons = actions.filter((a) => a.kind === "comparison");
-  const outreach = actions.filter((a) =>
-    ["editorial", "listicle_inclusion"].includes(a.kind),
-  );
-  const community = actions.filter((a) =>
-    ["subreddit", "youtube"].includes(a.kind),
-  );
-  const code = actions.filter((a) => a.kind === "code");
-  const videos = actions.filter((a) => a.kind === "video");
-
+  const pending = actions.filter((a) => !completed.has(a.id)).length;
+  const highPending = actions.filter(
+    (a) => !completed.has(a.id) && a.opportunity === "high",
+  ).length;
   const brandCount = company.brand_stats?.length ?? 0;
 
   return (
@@ -167,16 +141,24 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-5">
-        <Section label="General">
+        <Section label="Actions">
+          <NavItem
+            icon={Sparkles}
+            label="Actions"
+            badge={pending}
+            dot={highPending > 0}
+            active={current === "actions"}
+            onClick={() => onChange("actions")}
+          />
+        </Section>
+
+        <Section label="Insights">
           <NavItem
             icon={Home}
             label="Overview"
             active={current === "overview"}
             onClick={() => onChange("overview")}
           />
-        </Section>
-
-        <Section label="Insights">
           <NavItem
             icon={Star}
             label="Brands"
@@ -196,70 +178,6 @@ export default function Sidebar({
             badge={company.market_stats?.length}
             active={current === "markets"}
             onClick={() => onChange("markets")}
-          />
-        </Section>
-
-        <Section label="Actions" beta>
-          <NavItem
-            icon={Sparkles}
-            label="Owned"
-            badge={owned.length}
-            dot={ownedHigh > 0}
-            active={current === "owned"}
-            onClick={() => onChange("owned")}
-          />
-          <NavItem
-            icon={Sparkles}
-            label="Earned"
-            badge={earned.length}
-            dot={earnedHigh > 0}
-            active={current === "earned"}
-            onClick={() => onChange("earned")}
-          />
-        </Section>
-
-        <Section label="Studio">
-          <NavItem
-            icon={FileText}
-            label="Articles"
-            badge={articles.length}
-            active={current === "studio-articles"}
-            onClick={() => onChange("studio-articles")}
-          />
-          <NavItem
-            icon={GitCompareArrows}
-            label="Comparisons"
-            badge={comparisons.length}
-            active={current === "studio-comparisons"}
-            onClick={() => onChange("studio-comparisons")}
-          />
-          <NavItem
-            icon={MessageSquare}
-            label="Outreach"
-            badge={outreach.length}
-            active={current === "studio-outreach"}
-            onClick={() => onChange("studio-outreach")}
-          />
-          <NavItem
-            icon={Users}
-            label="Community"
-            badge={community.length}
-            active={current === "studio-community"}
-            onClick={() => onChange("studio-community")}
-          />
-          <NavItem
-            icon={Code}
-            label="Code"
-            badge={code.length}
-            active={current === "studio-code"}
-            onClick={() => onChange("studio-code")}
-          />
-          <NavItem
-            icon={Play}
-            label="Videos"
-            badge={videos.length}
-            active={current === "studio-videos"}
-            onClick={() => onChange("studio-videos")}
           />
         </Section>
       </nav>

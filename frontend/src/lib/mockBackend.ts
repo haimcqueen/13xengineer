@@ -561,11 +561,14 @@ function buildResult(action: ActionOut, company: CompanyOut): AgentResult {
     }
     case "video": {
       const duration = Number(action.target.duration_target_seconds ?? 90);
+      const isLegora = /legora/i.test(company.name);
       return {
         type: "video",
         title: action.title,
         duration_seconds: duration,
-        video_url: `https://demo.felix.local/videos/${company.id}/preview.mp4`,
+        video_url: isLegora
+          ? "/videos/jude_law.mp4"
+          : `https://demo.felix.local/videos/${company.id}/preview.mp4`,
         thumbnail_url: `https://demo.felix.local/videos/${company.id}/thumb.jpg`,
         storyboard: [
           "Open on a 60-page contract on screen.",

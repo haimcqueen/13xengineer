@@ -1,7 +1,10 @@
-import { ArrowUpRight, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 
+import AgentBadge from "@/components/AgentBadge";
+import { agentAccent, agentVerbs } from "@/lib/agentIdentity";
 import GlassPanel from "@/components/GlassPanel";
 import type { ActionOut, Opportunity } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type Props = {
   action: ActionOut;
@@ -15,12 +18,6 @@ const OPPORTUNITY_LABEL: Record<Opportunity, string> = {
   low: "Low",
 };
 
-const AGENT_LABEL: Record<string, string> = {
-  article: "article agent",
-  video: "video agent",
-  "code-pr": "code agent",
-};
-
 function OpportunityChip({ value }: { value: Opportunity }) {
   const styles =
     value === "high"
@@ -30,7 +27,10 @@ function OpportunityChip({ value }: { value: Opportunity }) {
         : "bg-transparent text-muted-foreground ring-[var(--border)]";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.2em] ring-1 ring-inset ${styles}`}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.2em] ring-1 ring-inset",
+        styles,
+      )}
     >
       {value === "high" && <Sparkles className="size-2.5" />}
       {OPPORTUNITY_LABEL[value]}
@@ -55,38 +55,45 @@ function targetChips(target: ActionOut["target"]): string[] {
 }
 
 function humanize(key: string): string {
-  return key
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (m) => m.toUpperCase());
+  return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 export default function ActionCard({ action, onRun, completed }: Props) {
   const chips = targetChips(action.target);
-  const runnable = action.suggested_agent !== null;
+  const agent = action.suggested_agent;
+  const verbs = agentVerbs(agent);
+  const accent = agentAccent(agent);
+
+  const ctaLabel = completed ? verbs.done : verbs.idle;
 
   return (
-    <GlassPanel className={`flex h-full flex-col p-6 ${completed ? "ring-1 ring-green-400/30" : ""}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        {completed ? (
-          <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-green-600 ring-1 ring-inset ring-green-200">
-            <CheckCircle2 className="size-2.5" />
-            Done
-          </span>
-        ) : (
-          <OpportunityChip value={action.opportunity} />
-        )}
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {action.kind.replace(/_/g, " ")}
-        </span>
+    <GlassPanel
+      flat
+      className={cn(
+        "flex flex-col p-5",
+        completed && "ring-1 ring-emerald-400/35",
+      )}
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <AgentBadge agent={agent} />
+          {completed && (
+            <span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-emerald-50 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              <CheckCircle2 className="size-2.5" />
+              Done
+            </span>
+          )}
+        </div>
+        <OpportunityChip value={action.opportunity} />
       </div>
 
       <h3
-        className="mb-3 font-display text-rose"
+        className="mb-2 font-display text-rose"
         style={{
-          fontSize: "20px",
+          fontSize: "18px",
           lineHeight: 1.2,
           letterSpacing: "-0.015em",
-          fontWeight: 400,
+          fontWeight: 500,
           fontVariationSettings: '"opsz" 60, "SOFT" 50',
         }}
       >
@@ -94,17 +101,17 @@ export default function ActionCard({ action, onRun, completed }: Props) {
       </h3>
 
       {action.rationale && (
-        <p className="mb-5 text-[13px] leading-relaxed text-muted-foreground">
+        <p className="mb-3 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">
           {action.rationale}
         </p>
       )}
 
       {chips.length > 0 && (
-        <div className="mb-5 flex flex-wrap gap-1.5">
-          {chips.map((c) => (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {chips.slice(0, 3).map((c) => (
             <span
               key={c}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--ink-2)]/40 px-2 py-1 font-mono text-[10.5px] text-rose/80"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--ink-2)]/40 px-2 py-0.5 font-mono text-[10px] text-rose/80"
             >
               {c}
             </span>
@@ -112,36 +119,27 @@ export default function ActionCard({ action, onRun, completed }: Props) {
         </div>
       )}
 
-      <div className="mt-auto border-t border-[var(--border)] pt-4">
-        {completed ? (
-          <button
-            type="button"
-            onClick={() => onRun(action)}
-            className="group inline-flex items-center gap-2 text-[12px] font-medium text-green-600 transition-colors hover:text-green-700"
-          >
-            <span className="font-mono uppercase tracking-[0.16em]">
-              View article
-            </span>
-            <ArrowUpRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </button>
-        ) : runnable ? (
-          <button
-            type="button"
-            onClick={() => onRun(action)}
-            className="group inline-flex items-center gap-2 text-[12px] font-medium text-[var(--blue)] transition-colors hover:text-[var(--blue-soft)]"
-          >
-            <span className="font-mono uppercase tracking-[0.16em]">
-              Run with {AGENT_LABEL[action.suggested_agent ?? ""] ?? "agent"}
-            </span>
-            <ArrowUpRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </button>
-        ) : (
-          <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            <span className="size-1 rounded-full bg-[var(--lavender)]/40" />
-            Manual action
-          </span>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={() => onRun(action)}
+        className="mt-auto group flex w-full items-center justify-between gap-2 rounded-[var(--radius-md)] px-3.5 py-2 text-[12.5px] font-medium ring-1 ring-inset transition-transform hover:translate-y-[-1px]"
+        style={{
+          backgroundColor: completed ? "rgba(16, 185, 129, 0.08)" : accent.bg,
+          color: completed ? "#047857" : accent.fg,
+          boxShadow: completed
+            ? "inset 0 0 0 1px rgba(16, 185, 129, 0.25)"
+            : `inset 0 0 0 1px ${accent.fg}26`,
+        }}
+      >
+        <span className="inline-flex items-center gap-2">
+          {completed && <CheckCircle2 className="size-3.5" strokeWidth={2.25} />}
+          {ctaLabel}
+        </span>
+        <ArrowRight
+          className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5"
+          strokeWidth={2}
+        />
+      </button>
     </GlassPanel>
   );
 }
