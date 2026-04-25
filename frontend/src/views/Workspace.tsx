@@ -34,6 +34,11 @@ type Props = {
 export default function Workspace({ company, actions, onReset }: Props) {
   const [view, setView] = useState<WorkspaceView>("overview");
   const [running, setRunning] = useState<ActionOut | null>(null);
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
+
+  function handleAgentDone(actionId: string) {
+    setCompleted((prev) => new Set(prev).add(actionId));
+  }
 
   return (
     <div className="relative z-10 flex min-h-svh w-full">
@@ -52,6 +57,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               key="overview"
               company={company}
               actions={actions}
+              completed={completed}
               onSelect={setRunning}
             />
           )}
@@ -74,6 +80,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               title="Owned media"
               subtitle="Surfaces you control — articles, comparisons, schema, video"
               actions={actions.filter((a) => a.category === "owned_media")}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -83,6 +90,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               title="Earned media"
               subtitle="Third-party citations — editorial, community, references"
               actions={actions.filter((a) => a.category === "earned_media")}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -95,6 +103,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               actions={actions.filter((a) =>
                 ["article", "listicle"].includes(a.kind),
               )}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -105,6 +114,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               title="Comparisons"
               subtitle="Head-to-head pages targeting competitor-comparison queries"
               actions={actions.filter((a) => a.kind === "comparison")}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -117,6 +127,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               actions={actions.filter((a) =>
                 ["editorial", "listicle_inclusion"].includes(a.kind),
               )}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -129,6 +140,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               actions={actions.filter((a) =>
                 ["subreddit", "youtube"].includes(a.kind),
               )}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -139,6 +151,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               title="Code & schema"
               subtitle="Structured data, llms.txt, and on-page changes"
               actions={actions.filter((a) => a.kind === "code")}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -149,6 +162,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
               title="Videos"
               subtitle="Demo videos, walkthroughs, and feature highlights"
               actions={actions.filter((a) => a.kind === "video")}
+              completed={completed}
               onRun={setRunning}
             />
           )}
@@ -162,6 +176,7 @@ export default function Workspace({ company, actions, onReset }: Props) {
             action={running}
             company={company}
             onClose={() => setRunning(null)}
+            onDone={() => handleAgentDone(running.id)}
           />
         )}
       </AnimatePresence>
@@ -174,10 +189,12 @@ export default function Workspace({ company, actions, onReset }: Props) {
 function OverviewPane({
   company,
   actions,
+  completed,
   onSelect,
 }: {
   company: CompanyOut;
   actions: ActionOut[];
+  completed: Set<string>;
   onSelect: (a: ActionOut) => void;
 }) {
   const ownStat = useMemo(
@@ -325,6 +342,7 @@ function OverviewPane({
             Ship this week
           </h2>
           <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground/75">
+            {completed.size > 0 && <span className="text-green-600">{completed.size} done · </span>}
             {topActions.length} of {actions.length} →
           </span>
         </div>
@@ -450,11 +468,13 @@ function ActionsPane({
   title,
   subtitle,
   actions,
+  completed,
   onRun,
 }: {
   title: string;
   subtitle: string;
   actions: ActionOut[];
+  completed: Set<string>;
   onRun: (a: ActionOut) => void;
 }) {
   const sorted = [...actions].sort(
@@ -474,7 +494,7 @@ function ActionsPane({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.04 * i, duration: 0.5, ease }}
             >
-              <ActionCard action={a} onRun={onRun} />
+              <ActionCard action={a} onRun={onRun} completed={completed.has(a.id)} />
             </motion.div>
           ))}
         </div>
@@ -490,12 +510,14 @@ function StudioPane({
   title,
   subtitle,
   actions,
+  completed,
   onRun,
 }: {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   title: string;
   subtitle: string;
   actions: ActionOut[];
+  completed?: Set<string>;
   onRun: (a: ActionOut) => void;
 }) {
   return (
@@ -516,7 +538,7 @@ function StudioPane({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.04 * i, duration: 0.5, ease }}
             >
-              <ActionCard action={a} onRun={onRun} />
+              <ActionCard action={a} onRun={onRun} completed={completed?.has(a.id)} />
             </motion.div>
           ))}
         </div>

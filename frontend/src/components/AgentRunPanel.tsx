@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Check,
@@ -12,6 +12,7 @@ import {
   Play,
   X,
 } from "lucide-react";
+import Markdown from "react-markdown";
 
 import GlassPanel from "@/components/GlassPanel";
 import { getJob, startAgentRun } from "@/lib/mockBackend";
@@ -29,6 +30,7 @@ type Props = {
   action: ActionOut;
   company: CompanyOut;
   onClose: () => void;
+  onDone?: () => void;
 };
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -39,27 +41,33 @@ const AGENT_TITLE: Record<string, string> = {
   "code-pr": "Opening pull request",
 };
 
-export default function AgentRunPanel({ action, company, onClose }: Props) {
+export default function AgentRunPanel({ action, company, onClose, onDone }: Props) {
   const [jobId] = useState(() => startAgentRun(action, company));
   const [job, setJob] = useState<JobOut | null>(() => getJob(jobId));
+  const [notifiedDone, setNotifiedDone] = useState(false);
 
   useEffect(() => {
     let raf = 0;
     let timer = 0;
     const tick = () => {
       const j = getJob(jobId);
-      setJob(j);
+      // Spread to create a new reference so React detects the change
+      setJob(j ? { ...j, progress: [...j.progress] } : null);
+      if (j && j.status === "done" && !notifiedDone) {
+        setNotifiedDone(true);
+        onDone?.();
+      }
       if (j && (j.status === "done" || j.status === "failed")) return;
       timer = window.setTimeout(() => {
         raf = requestAnimationFrame(tick);
-      }, 250);
+      }, 200);
     };
     tick();
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(timer);
     };
-  }, [jobId]);
+  }, [jobId, notifiedDone, onDone]);
 
   // Esc to close
   useEffect(() => {
@@ -70,13 +78,9 @@ export default function AgentRunPanel({ action, company, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const stages = useMemo(
-    () =>
-      (job?.progress ?? [])
-        .filter((p) => p.type === "stage")
-        .map((p) => String(p.data.label)),
-    [job],
-  );
+  const stages = (job?.progress ?? [])
+    .filter((p) => p.type === "stage")
+    .map((p) => String(p.data.label));
 
   const status = job?.status ?? "pending";
   const agent = action.suggested_agent ?? "article";
@@ -171,18 +175,35 @@ function doneTitle(agent: string): string {
   }
 }
 
+const ALL_STAGE_LABELS: Record<string, string[]> = {
+  article: [
+    "Researching keywords & intent",
+    "Deep research & data collection",
+    "Structuring the article",
+    "Writing the full article",
+  ],
+  video: [
+    "Drafting storyboard",
+    "Selecting shots",
+    "Rendering preview",
+  ],
+  "code-pr": [
+    "Cloning repo",
+    "Generating diff",
+    "Opening pull request",
+  ],
+};
+
 function Stages({ stages, agent }: { stages: string[]; agent: string }) {
-  const all = [...stages];
-  const expected =
-    agent === "article" ? 3 : agent === "video" ? 3 : 3;
-  while (all.length < expected) all.push("");
+  const labels = ALL_STAGE_LABELS[agent] ?? [];
+  const completedCount = stages.length;
 
   return (
     <ol className="space-y-3">
-      {all.map((label, i) => {
-        const completed = i < stages.length - (label === "" ? 0 : 1);
-        const active = label !== "" && i === stages.length - 1;
-        const pending = label === "";
+      {labels.map((label, i) => {
+        const done = i < completedCount - 1;
+        const active = i === completedCount - 1;
+        const pending = i >= completedCount;
         return (
           <li
             key={i}
@@ -192,14 +213,14 @@ function Stages({ stages, agent }: { stages: string[]; agent: string }) {
           >
             <span
               className={`grid size-6 place-items-center rounded-full ${
-                completed
-                  ? "bg-[var(--blue)] text-white"
+                done
+                  ? "bg-green-500 text-white"
                   : active
                     ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
                     : "bg-[var(--ink-2)]/60 text-muted-foreground"
               }`}
             >
-              {completed ? (
+              {done ? (
                 <Check className="size-3" strokeWidth={3} />
               ) : active ? (
                 <Loader2 className="size-3 animate-spin" />
@@ -212,7 +233,7 @@ function Stages({ stages, agent }: { stages: string[]; agent: string }) {
                 pending ? "text-muted-foreground/60" : "text-rose"
               }`}
             >
-              {label || `Step ${i + 1}`}
+              {label}
             </span>
           </li>
         );
@@ -229,6 +250,7 @@ function ResultBody({ result }: { result: AgentResult }) {
 
 function ArticleBody({ result }: { result: ArticleResult }) {
   const [copied, setCopied] = useState(false);
+  const [postState, setPostState] = useState<"idle" | "loading" | "done">("idle");
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(result.markdown);
@@ -239,25 +261,57 @@ function ArticleBody({ result }: { result: ArticleResult }) {
     }
   };
 
+  const handlePost = () => {
+    setPostState("loading");
+    setTimeout(() => setPostState("done"), 1800);
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
         <FileText className="size-3" />
-        <span>Markdown · ~{result.word_count_estimate.toLocaleString()} words</span>
+        <span>Article · ~{result.word_count_estimate.toLocaleString()} words</span>
       </div>
 
-      <pre className="max-h-[48vh] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--ink-2)]/40 p-5 font-mono text-[12.5px] leading-relaxed text-rose/90 whitespace-pre-wrap">
-        {result.markdown}
-      </pre>
+      <div className="prose prose-sm max-h-[48vh] max-w-none overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-white/60 p-6 text-rose/90 prose-headings:text-rose prose-headings:font-medium prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-[13px] prose-p:leading-relaxed prose-li:text-[13px] prose-table:text-[12px] prose-th:text-left prose-th:font-medium prose-td:py-1.5 prose-a:text-[var(--blue)]">
+        <Markdown>{result.markdown}</Markdown>
+      </div>
 
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--blue)] px-4 py-2 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/80 px-4 py-2 text-[12px] font-medium text-rose transition-colors hover:bg-white"
         >
           {copied ? <Check className="size-3.5" strokeWidth={3} /> : <Copy className="size-3.5" />}
           {copied ? "Copied" : "Copy markdown"}
+        </button>
+        <button
+          type="button"
+          onClick={handlePost}
+          disabled={postState !== "idle"}
+          className={`inline-flex items-center gap-2 rounded-[var(--radius-pill)] px-4 py-2 text-[12px] font-medium text-white transition-all ${
+            postState === "done"
+              ? "bg-green-500"
+              : "bg-[var(--blue)] hover:opacity-90"
+          } disabled:cursor-default`}
+        >
+          {postState === "loading" ? (
+            <>
+              <Loader2 className="size-3.5 animate-spin" />
+              Posting...
+            </>
+          ) : postState === "done" ? (
+            <>
+              <Check className="size-3.5" strokeWidth={3} />
+              Posted!
+            </>
+          ) : (
+            <>
+              <ExternalLink className="size-3.5" />
+              Post to blog
+            </>
+          )}
         </button>
       </div>
     </div>

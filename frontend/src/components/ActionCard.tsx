@@ -1,4 +1,4 @@
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Sparkles } from "lucide-react";
 
 import GlassPanel from "@/components/GlassPanel";
 import type { ActionOut, Opportunity } from "@/lib/types";
@@ -6,6 +6,7 @@ import type { ActionOut, Opportunity } from "@/lib/types";
 type Props = {
   action: ActionOut;
   onRun: (action: ActionOut) => void;
+  completed?: boolean;
 };
 
 const OPPORTUNITY_LABEL: Record<Opportunity, string> = {
@@ -59,14 +60,21 @@ function humanize(key: string): string {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-export default function ActionCard({ action, onRun }: Props) {
+export default function ActionCard({ action, onRun, completed }: Props) {
   const chips = targetChips(action.target);
   const runnable = action.suggested_agent !== null;
 
   return (
-    <GlassPanel className="flex h-full flex-col p-6">
+    <GlassPanel className={`flex h-full flex-col p-6 ${completed ? "ring-1 ring-green-400/30" : ""}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <OpportunityChip value={action.opportunity} />
+        {completed ? (
+          <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-green-600 ring-1 ring-inset ring-green-200">
+            <CheckCircle2 className="size-2.5" />
+            Done
+          </span>
+        ) : (
+          <OpportunityChip value={action.opportunity} />
+        )}
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           {action.kind.replace(/_/g, " ")}
         </span>
@@ -105,7 +113,18 @@ export default function ActionCard({ action, onRun }: Props) {
       )}
 
       <div className="mt-auto border-t border-[var(--border)] pt-4">
-        {runnable ? (
+        {completed ? (
+          <button
+            type="button"
+            onClick={() => onRun(action)}
+            className="group inline-flex items-center gap-2 text-[12px] font-medium text-green-600 transition-colors hover:text-green-700"
+          >
+            <span className="font-mono uppercase tracking-[0.16em]">
+              View article
+            </span>
+            <ArrowUpRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </button>
+        ) : runnable ? (
           <button
             type="button"
             onClick={() => onRun(action)}
