@@ -345,6 +345,57 @@ const LEGORA_ACTIONS: ActionOut[] = [
     },
     suggested_agent: null,
   },
+  {
+    id: "a_legora_blog_1",
+    category: "owned_media",
+    kind: "article",
+    title: "AI Document Review for M&A Due Diligence: What Actually Works",
+    rationale:
+      "OWNED·ARTICLE targets high-intent commercial keyword 'AI document review due diligence'. Lawyers evaluating tools for M&A search this exact phrase. Legora's Tabular Review is built for this use case, but no owned content ranks for it. Article includes BAHR adoption data (80%) as proof point.",
+    opportunity: "high",
+    target: {
+      format: "article",
+      topic: "AI document review M&A due diligence",
+      citations_in_category: 2841,
+      status: "draft_ready",
+      draft_path: "blog/content/drafts/ai-document-review-ma-due-diligence/04-article.md",
+    },
+    suggested_agent: "article",
+  },
+  {
+    id: "a_legora_blog_2",
+    category: "owned_media",
+    kind: "article",
+    title: "How to Evaluate Legal AI Tools: A Framework for Law Firm Decision-Makers",
+    rationale:
+      "OWNED·ARTICLE targets managing partners and innovation leads comparing vendors. 'How to evaluate legal AI' has high commercial intent, and Legora's 80% adoption rate at BAHR is the strongest proof point in the market. Article includes a 6-dimension framework and comparison table (Legora vs Harvey vs CoCounsel vs Luminance).",
+    opportunity: "high",
+    target: {
+      format: "article",
+      topic: "evaluate legal AI tools framework",
+      citations_in_category: 1932,
+      status: "draft_ready",
+      draft_path: "blog/content/drafts/evaluate-legal-ai-tools-framework/04-article.md",
+    },
+    suggested_agent: "article",
+  },
+  {
+    id: "a_legora_blog_3",
+    category: "owned_media",
+    kind: "article",
+    title: "Outside Counsel Guidelines Are Getting Stricter. Here's How Firms Are Adapting.",
+    rationale:
+      "OWNED·ARTICLE extends the existing billable hour thought piece into operational territory. Targets 'outside counsel guidelines AI' — a real pain point as clients refuse to pay for work AI can do. Connects Legora's workflow integration (Word Add-in, Tabular Review) to OCG compliance.",
+    opportunity: "high",
+    target: {
+      format: "article",
+      topic: "outside counsel guidelines AI law firms",
+      citations_in_category: 1247,
+      status: "draft_ready",
+      draft_path: "blog/content/drafts/outside-counsel-guidelines-firms-adapting/04-article.md",
+    },
+    suggested_agent: "article",
+  },
 ];
 
 // Sparser sets for the other tracked companies — same shape, fewer entries.
