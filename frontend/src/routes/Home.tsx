@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 
 import Atmosphere from "@/components/Atmosphere";
+import LiquidGlassFilter from "@/components/LiquidGlassFilter";
 import EntryView from "@/views/EntryView";
-import InsightsView from "@/views/InsightsView";
 import NoMatchView from "@/views/NoMatchView";
 import ResolvingView from "@/views/ResolvingView";
+import Workspace from "@/views/Workspace";
 import { getActions, getCompany } from "@/lib/mockBackend";
 import type { ResolveError } from "@/lib/types";
 
@@ -57,6 +58,7 @@ export default function Home() {
 
   return (
     <>
+      <LiquidGlassFilter />
       <Atmosphere />
       <main className="grain relative min-h-svh">
         <AnimatePresence mode="popLayout" initial={false}>
@@ -77,7 +79,7 @@ export default function Home() {
             />
           )}
           {view === "insights" && company && (
-            <InsightsView
+            <Workspace
               key="insights"
               company={company}
               actions={actions}

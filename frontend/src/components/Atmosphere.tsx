@@ -7,17 +7,10 @@ export default function Atmosphere() {
       <div className="blob blob-a" />
       <div className="blob blob-b" />
       <div className="blob blob-c" />
-      {/* Vignette to keep edges quiet — fades to bg color on a light surface */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 50% 50%, transparent 50%, rgba(246,239,243,0.6) 100%)",
-        }}
-      />
+      <div className="blob blob-d" />
       {/* Faint gridline for editorial rhythm */}
       <svg
-        className="absolute inset-0 h-full w-full opacity-[0.05]"
+        className="absolute inset-0 h-full w-full opacity-[0.04]"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>

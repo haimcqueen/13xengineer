@@ -10,7 +10,7 @@ const GlassPanel = forwardRef<HTMLDivElement, Props>(
     <div
       ref={ref}
       className={cn(
-        "glass rounded-[var(--radius-lg)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[2px]",
+        "glass glass-elastic rounded-[var(--radius-lg)]",
         strong && "glass-strong",
         className,
       )}

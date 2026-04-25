@@ -13,6 +13,27 @@ export type TopicOut = {
   name: string;
 };
 
+export type BrandStat = {
+  brand_id: string;
+  brand_name: string;
+  visibility: number;        // 0..1
+  share_of_voice: number;    // 0..1
+  sentiment: number;         // 0..100
+  position: number;          // avg rank when mentioned (lower = better)
+  mention_count: number;
+  is_own: boolean;
+};
+
+export type MarketStat = {
+  country_code: string;      // ISO-3166-1 alpha-2
+  country_name: string;
+  lat: number;
+  lng: number;
+  prompt_count: number;
+  visibility: number;        // 0..1 — own-brand visibility in this market
+  position: number;          // own-brand avg position in this market
+};
+
 export type CompanyOut = {
   id: string;
   name: string;
@@ -21,6 +42,9 @@ export type CompanyOut = {
   topics: TopicOut[];
   prompt_count: number;
   last_refreshed_at: string;
+  brand_stats?: BrandStat[];
+  market_stats?: MarketStat[];
+  total_chats?: number;
 };
 
 export type ActionCategory = "owned_media" | "earned_media";
