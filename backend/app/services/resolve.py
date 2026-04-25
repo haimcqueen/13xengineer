@@ -154,6 +154,7 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
         )
 
     mcp = get_mcp_client()
+    jobs_svc.append_event(db, job_id, "actions_pending", {})
     try:
         mcp_actions = await mcp.get_actions(match.project_id)
     except Exception as e:  # noqa: BLE001 — MCP failure must not break resolve

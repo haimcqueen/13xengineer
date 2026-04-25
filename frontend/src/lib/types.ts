@@ -13,6 +13,26 @@ export type TopicOut = {
   name: string;
 };
 
+export type ModelOut = {
+  name: string;
+  active: boolean;
+};
+
+export type TagOut = {
+  name: string;
+  count: number;
+};
+
+export type CountryPrompts = {
+  code: string; // ISO-2: "ES", "GB", "US", ...
+  count: number;
+};
+
+export type SamplePrompt = {
+  text: string;
+  country: string;
+};
+
 export type CompanyOut = {
   id: string;
   name: string;
@@ -21,6 +41,12 @@ export type CompanyOut = {
   topics: TopicOut[];
   prompt_count: number;
   last_refreshed_at: string;
+  // Extended scope fields (optional — backend will add to CompanyOut once exposed).
+  competitor_brands?: BrandOut[];
+  tags?: TagOut[];
+  models?: ModelOut[];
+  prompts_by_country?: CountryPrompts[];
+  sample_prompts?: SamplePrompt[];
 };
 
 export type ActionCategory = "owned_media" | "earned_media";

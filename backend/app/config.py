@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     peec_use_real_mcp: bool = False
 
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-opus-4-7"
+    anthropic_model: str = "claude-sonnet-4-6"
 
     snapshot_ttl_seconds: int = 600
 

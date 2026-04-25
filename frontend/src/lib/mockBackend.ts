@@ -38,9 +38,82 @@ const COMPANIES: Record<CompanyKey, CompanyOut> = {
       domains: ["legora.com"],
       is_own: true,
     },
-    topics: [{ id: "t_legora_1", name: "AI-powered document review tools" }],
-    prompt_count: 30,
+    topics: [
+      { id: "t_legora_1", name: "BigLaw & Enterprise" },
+      { id: "t_legora_2", name: "Comparisons & Alternatives" },
+      { id: "t_legora_3", name: "M&A & Due Diligence" },
+      { id: "t_legora_4", name: "AI-powered document review tools" },
+      { id: "t_legora_5", name: "EU & Compliance" },
+      { id: "t_legora_6", name: "Workflows & Office Integration" },
+    ],
+    prompt_count: 421,
     last_refreshed_at: now(),
+    competitor_brands: [
+      { id: "b_harvey", name: "Harvey", domains: ["harvey.ai"], is_own: false },
+      { id: "b_spellbook", name: "Spellbook", domains: ["spellbook.legal"], is_own: false },
+      { id: "b_luminance", name: "Luminance", domains: ["luminance.com"], is_own: false },
+      { id: "b_ironclad", name: "Ironclad", domains: ["ironcladapp.com"], is_own: false },
+      { id: "b_clio", name: "Clio Duo", domains: ["clio.com"], is_own: false },
+      { id: "b_legalfly", name: "LegalFly", domains: ["legalfly.com"], is_own: false },
+      { id: "b_leah", name: "Leah", domains: ["leah.ai"], is_own: false },
+      { id: "b_streamline", name: "Streamline AI", domains: ["streamlineai.com"], is_own: false },
+    ],
+    tags: [
+      { name: "branded", count: 178 },
+      { name: "non-branded", count: 142 },
+      { name: "informational", count: 67 },
+      { name: "transactional", count: 34 },
+    ],
+    models: [
+      { name: "ChatGPT", active: true },
+      { name: "Claude Sonnet 4", active: true },
+      { name: "Claude Haiku 4.5", active: true },
+      { name: "Gemini", active: true },
+      { name: "Perplexity", active: true },
+      { name: "GPT 5 Search", active: true },
+      { name: "AI Mode", active: true },
+      { name: "AI Overview", active: true },
+      { name: "Copilot", active: true },
+      { name: "Grok", active: true },
+      { name: "DeepSeek R1", active: false },
+      { name: "Gemini 1.5 Flash", active: false },
+      { name: "GPT-4o", active: false },
+      { name: "Grok API", active: false },
+      { name: "Llama", active: false },
+      { name: "Qwen", active: false },
+      { name: "Sonar", active: false },
+    ],
+    prompts_by_country: [
+      { code: "ES", count: 142 },
+      { code: "GB", count: 98 },
+      { code: "US", count: 86 },
+      { code: "DE", count: 52 },
+      { code: "AU", count: 28 },
+      { code: "FR", count: 8 },
+      { code: "IT", count: 7 },
+    ],
+    sample_prompts: [
+      {
+        text: "Top despachos de abogados en España que usan IA en 2026",
+        country: "ES",
+      },
+      {
+        text: "AI for UK construction and infrastructure law firms",
+        country: "GB",
+      },
+      {
+        text: "Best AI for environmental law firms in the US",
+        country: "US",
+      },
+      {
+        text: "AI tool for German employment law document review",
+        country: "DE",
+      },
+      {
+        text: "Best legal AI for due diligence in M&A",
+        country: "GB",
+      },
+    ],
   },
   bmw: {
     id: "c_bmw",
@@ -486,41 +559,54 @@ export function startAgentRun(action: ActionOut, company: CompanyOut): string {
   const agent = action.suggested_agent;
   const stages = stageLabels(agent);
 
-  // Schedule transitions
-  const startedAt = Date.now();
+  // Schedule transitions. Each callback writes a NEW JobOut object so React
+  // can detect changes via reference equality (mutating in place would defeat
+  // memoization on the consumer side).
   const stageTimes = [200, 700, 1400, 2100, 2400];
 
-  setTimeout(() => {
+  const patch = (jobId: string, fn: (j: JobOut) => JobOut) => {
     const j = jobs.get(jobId);
     if (!j) return;
-    j.status = "running";
-    j.progress.push({ t: now(), type: "running", data: { agent } });
+    jobs.set(jobId, fn(j));
+  };
+
+  setTimeout(() => {
+    patch(jobId, (j) => ({
+      ...j,
+      status: "running",
+      progress: [...j.progress, { t: now(), type: "running", data: { agent } }],
+    }));
   }, stageTimes[0]);
 
   for (let i = 0; i < stages.length; i++) {
-    setTimeout(() => {
-      const j = jobs.get(jobId);
-      if (!j) return;
-      j.progress.push({ t: now(), type: "stage", data: { label: stages[i] } });
-    }, stageTimes[1] + i * 350);
+    setTimeout(
+      () => {
+        patch(jobId, (j) => ({
+          ...j,
+          progress: [
+            ...j.progress,
+            { t: now(), type: "stage", data: { label: stages[i] } },
+          ],
+        }));
+      },
+      stageTimes[1] + i * 350,
+    );
   }
 
   setTimeout(
     () => {
-      const j = jobs.get(jobId);
-      if (!j) return;
-      j.status = "done";
-      j.progress.push({ t: now(), type: "done", data: {} });
-      j.result = buildResult(action, company) as unknown as Record<
-        string,
-        unknown
-      >;
+      patch(jobId, (j) => ({
+        ...j,
+        status: "done",
+        progress: [...j.progress, { t: now(), type: "done", data: {} }],
+        result: buildResult(action, company) as unknown as Record<
+          string,
+          unknown
+        >,
+      }));
     },
     stageTimes[1] + stages.length * 350 + 200,
   );
-
-  // (startedAt unused but useful if we later add elapsed time.)
-  void startedAt;
 
   return jobId;
 }

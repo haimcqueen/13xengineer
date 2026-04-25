@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Check, Loader2, Sparkles, X, Zap } from "lucide-react";
 
 import ActionCard from "@/components/ActionCard";
 import AgentRunPanel from "@/components/AgentRunPanel";
 import FelixMark from "@/components/FelixMark";
-import type { ActionOut, CompanyOut, Opportunity } from "@/lib/types";
+import { getJob, startAgentRun } from "@/lib/mockBackend";
+import type { ActionOut, CompanyOut, JobOut, Opportunity } from "@/lib/types";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -28,7 +29,36 @@ const reveal = {
 };
 
 export default function InsightsView({ company, actions, onReset }: Props) {
-  const [running, setRunning] = useState<ActionOut | null>(null);
+  // actionId → jobId
+  const [runs, setRuns] = useState<Record<string, string>>({});
+  // actionId → JobOut snapshot (single source of truth, refreshed by one timer)
+  const [jobs, setJobs] = useState<Record<string, JobOut>>({});
+  const [viewing, setViewing] = useState<ActionOut | null>(null);
+
+  // Single polling effect — pulls each in-flight job once per tick.
+  // When mockBackend writes new JobOut refs, React.memo'd cards re-render
+  // selectively; finished jobs keep stable refs and skip render entirely.
+  useEffect(() => {
+    if (Object.keys(runs).length === 0) return;
+    const tick = () => {
+      const next: Record<string, JobOut> = {};
+      let anyInflight = false;
+      for (const [actionId, jobId] of Object.entries(runs)) {
+        const j = getJob(jobId);
+        if (j) {
+          next[actionId] = j;
+          if (j.status !== "done" && j.status !== "failed") anyInflight = true;
+        }
+      }
+      setJobs(next);
+      if (!anyInflight) {
+        window.clearInterval(interval);
+      }
+    };
+    tick();
+    const interval = window.setInterval(tick, 280);
+    return () => window.clearInterval(interval);
+  }, [runs]);
 
   const owned = useMemo(
     () =>
@@ -45,15 +75,63 @@ export default function InsightsView({ company, actions, onReset }: Props) {
     [actions],
   );
 
+  const runnable = useMemo(
+    () => actions.filter((a) => a.suggested_agent !== null),
+    [actions],
+  );
+  const completedCount = runnable.filter(
+    (a) => jobs[a.id]?.status === "done",
+  ).length;
+  const inflightCount = runnable.filter((a) => {
+    const j = jobs[a.id];
+    return j && (j.status === "pending" || j.status === "running");
+  }).length;
+  const allDone = completedCount === runnable.length && runnable.length > 0;
+  const anyInflight = inflightCount > 0;
+
   const refreshed = useMemo(
     () => formatRefreshed(company.last_refreshed_at),
     [company.last_refreshed_at],
   );
 
+  const runOne = useCallback(
+    (action: ActionOut) => {
+      if (!action.suggested_agent) return;
+      setRuns((prev) => {
+        if (prev[action.id]) return prev;
+        const jobId = startAgentRun(action, company);
+        return { ...prev, [action.id]: jobId };
+      });
+    },
+    [company],
+  );
+
+  const runAll = useCallback(() => {
+    setRuns((prev) => {
+      const next = { ...prev };
+      let added = false;
+      for (const a of runnable) {
+        if (next[a.id]) continue;
+        next[a.id] = startAgentRun(a, company);
+        added = true;
+      }
+      return added ? next : prev;
+    });
+  }, [company, runnable]);
+
+  const view = useCallback((action: ActionOut) => setViewing(action), []);
+
+  const countriesCount = company.prompts_by_country?.length ?? 0;
+  const competitorCount = company.competitor_brands?.length ?? 0;
+  const totalBrands = (company.own_brand ? 1 : 0) + competitorCount;
+  const activeModels = company.models?.filter((m) => m.active).length ?? 0;
+  const totalModels = company.models?.length ?? 0;
+  const brandName = brandDisplayName(company);
+
   return (
     <motion.section
       key="insights"
-      className="relative z-10 mx-auto w-full max-w-[1180px] px-6 pb-24 pt-7"
+      className="relative z-10 mx-auto w-full max-w-[960px] px-6 pb-24 pt-7"
       initial={{ opacity: 0, scale: 0.96, filter: "blur(10px)" }}
       animate={{
         opacity: 1,
@@ -64,7 +142,7 @@ export default function InsightsView({ company, actions, onReset }: Props) {
       exit={{ opacity: 0, transition: { duration: 0.35 } }}
       style={{ transformOrigin: "50% 50%" }}
     >
-      {/* Top brand strip — Felix on the left, reset on the right */}
+      {/* Top brand strip */}
       <div className="mb-10 flex items-center justify-between gap-4">
         <FelixMark size={28} withWordmark />
         <button
@@ -77,18 +155,18 @@ export default function InsightsView({ company, actions, onReset }: Props) {
         </button>
       </div>
 
-      {/* Hero — company name + metadata */}
+      {/* Hero */}
       <motion.div
         variants={reveal}
         custom={0}
         initial="hidden"
         animate="show"
-        className="mb-12"
+        className="mb-14"
       >
-        <div className="mb-2 flex items-center gap-3 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+        <div className="mb-3 flex items-center gap-3 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
           <span className="h-px w-8 bg-[var(--lavender)]/40" />
           <Sparkles className="size-3 text-[var(--blue-soft)]" />
-          Felix · Action plan
+          Felix · from your Peec project
         </div>
         <h1
           className="font-display text-rose"
@@ -100,7 +178,7 @@ export default function InsightsView({ company, actions, onReset }: Props) {
             fontVariationSettings: '"opsz" 144, "SOFT" 30',
           }}
         >
-          {brandDisplayName(company)}{" "}
+          Action plan{" "}
           <em
             className="text-[var(--lavender)]"
             style={{
@@ -108,63 +186,102 @@ export default function InsightsView({ company, actions, onReset }: Props) {
               fontVariationSettings: '"opsz" 144, "SOFT" 100, "WONK" 1',
             }}
           >
-            visibility
+            for {brandName}
           </em>
         </h1>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px] text-muted-foreground">
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px] text-muted-foreground">
           {company.own_domain && (
             <span className="font-mono text-rose/85">{company.own_domain}</span>
           )}
           <Dot />
-          <span>
-            <span className="text-rose">{company.prompt_count}</span> prompts
-          </span>
-          <Dot />
-          <span>
-            <span className="text-rose">{company.topics.length}</span>{" "}
-            topic{company.topics.length === 1 ? "" : "s"}
-          </span>
-          <Dot />
-          <span>
-            <span className="text-rose">{actions.length}</span> action
-            {actions.length === 1 ? "" : "s"}
-          </span>
+          <Stat n={company.prompt_count} label="prompts" />
+          {countriesCount > 0 && (
+            <>
+              <Dot />
+              <Stat n={countriesCount} label="countries" />
+            </>
+          )}
+          {totalBrands > 0 && (
+            <>
+              <Dot />
+              <Stat
+                n={totalBrands}
+                label={`brand${totalBrands === 1 ? "" : "s"} tracked`}
+              />
+            </>
+          )}
+          {totalModels > 0 && (
+            <>
+              <Dot />
+              <Stat n={`${activeModels}/${totalModels}`} label="AI models" />
+            </>
+          )}
           <Dot />
           <span>refreshed {refreshed}</span>
         </div>
+      </motion.div>
 
-        {company.topics.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {company.topics.map((t) => (
-              <span
-                key={t.id}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--ink-2)]/40 px-2.5 py-1 text-[11.5px] text-rose/85"
-              >
-                {t.name}
-              </span>
-            ))}
+      {/* Action plan section header */}
+      <motion.div
+        variants={reveal}
+        custom={1}
+        initial="hidden"
+        animate="show"
+        className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-4"
+      >
+        <div>
+          <div className="mb-1.5 text-[10.5px] uppercase tracking-[0.24em] text-muted-foreground">
+            Take action
           </div>
-        )}
+          <div
+            className="font-display text-rose"
+            style={{
+              fontSize: 22,
+              lineHeight: 1.1,
+              letterSpacing: "-0.015em",
+              fontWeight: 400,
+              fontVariationSettings: '"opsz" 60, "SOFT" 60',
+            }}
+          >
+            <span className="text-rose">{actions.length}</span>{" "}
+            <span className="text-[var(--lavender)]">things to ship</span>
+            {runnable.length > 0 && (
+              <span className="ml-2 text-[12.5px] text-muted-foreground">
+                · {runnable.length} can run with Felix
+              </span>
+            )}
+          </div>
+        </div>
+
+        <DoItAll
+          total={runnable.length}
+          completed={completedCount}
+          inflight={inflightCount}
+          allDone={allDone}
+          anyInflight={anyInflight}
+          onClick={runAll}
+        />
       </motion.div>
 
       {/* Owned media */}
       {owned.length > 0 && (
-        <Section
-          title="Owned media"
-          subtitle="Where you can ship something on your own surface"
-          count={owned.length}
-          delayBase={1}
-        >
+        <Section title="Owned media" count={owned.length} delayBase={2}>
           {owned.map((a, i) => (
             <motion.div
               key={a.id}
               variants={reveal}
-              custom={2 + i}
+              custom={3 + i}
               initial="hidden"
               animate="show"
             >
-              <ActionCard action={a} onRun={setRunning} />
+              <ActionCard
+                action={a}
+                index={i + 1}
+                job={jobs[a.id] ?? null}
+                onRun={runOne}
+                onViewResult={view}
+              />
             </motion.div>
           ))}
         </Section>
@@ -174,31 +291,37 @@ export default function InsightsView({ company, actions, onReset }: Props) {
       {earned.length > 0 && (
         <Section
           title="Earned media"
-          subtitle="Where presence comes from outside surfaces and citations"
           count={earned.length}
-          delayBase={2 + owned.length}
+          delayBase={3 + owned.length}
         >
           {earned.map((a, i) => (
             <motion.div
               key={a.id}
               variants={reveal}
-              custom={3 + owned.length + i}
+              custom={4 + owned.length + i}
               initial="hidden"
               animate="show"
             >
-              <ActionCard action={a} onRun={setRunning} />
+              <ActionCard
+                action={a}
+                index={owned.length + i + 1}
+                job={jobs[a.id] ?? null}
+                onRun={runOne}
+                onViewResult={view}
+              />
             </motion.div>
           ))}
         </Section>
       )}
 
       <AnimatePresence>
-        {running && (
+        {viewing && (
           <AgentRunPanel
-            key={running.id}
-            action={running}
+            key={viewing.id}
+            action={viewing}
             company={company}
-            onClose={() => setRunning(null)}
+            jobId={runs[viewing.id] ?? null}
+            onClose={() => setViewing(null)}
           />
         )}
       </AnimatePresence>
@@ -206,63 +329,116 @@ export default function InsightsView({ company, actions, onReset }: Props) {
   );
 }
 
+function DoItAll({
+  total,
+  completed,
+  inflight,
+  allDone,
+  anyInflight,
+  onClick,
+}: {
+  total: number;
+  completed: number;
+  inflight: number;
+  allDone: boolean;
+  anyInflight: boolean;
+  onClick: () => void;
+}) {
+  if (total === 0) return null;
+  const disabled = anyInflight || allDone;
+  const fillPct = total > 0 ? (completed / total) * 100 : 0;
+
+  const Icon = allDone ? Check : anyInflight ? Loader2 : Zap;
+  const iconExtraClass = anyInflight ? "animate-spin" : "";
+
+  const label = allDone
+    ? `All ${total} done`
+    : anyInflight
+      ? `Running ${inflight}`
+      : `Do it all`;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="group glass glass-cta relative inline-flex items-center gap-3 overflow-hidden rounded-[var(--radius-pill)] px-5 py-2.5 text-[12px] uppercase tracking-[0.16em] disabled:cursor-default"
+    >
+      <motion.span
+        aria-hidden
+        className="absolute inset-y-0 left-0 bg-gradient-to-r from-[rgba(30,91,201,0.10)] via-[rgba(30,91,201,0.16)] to-[rgba(30,91,201,0.10)]"
+        initial={false}
+        animate={{ width: anyInflight || allDone ? `${fillPct}%` : "0%" }}
+        transition={{ duration: 0.6, ease }}
+      />
+      <span
+        className={`relative grid size-5 place-items-center rounded-full ${
+          allDone ? "bg-[var(--blue)] text-white" : "text-[var(--blue)]"
+        }`}
+      >
+        <Icon
+          className={`size-3 ${iconExtraClass}`}
+          fill={!anyInflight && !allDone ? "currentColor" : undefined}
+          strokeWidth={allDone ? 3 : undefined}
+        />
+      </span>
+      <span className="relative font-medium text-rose">{label}</span>
+      {!allDone && total > 0 && (
+        <span className="relative font-mono text-[11px] tabular-nums text-muted-foreground">
+          {anyInflight ? `${completed}/${total}` : total}
+        </span>
+      )}
+      {!anyInflight && !allDone && (
+        <ArrowUpRight className="relative size-3.5 text-[var(--blue)] transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      )}
+    </button>
+  );
+}
+
 function Section({
   title,
-  subtitle,
   count,
   delayBase,
   children,
 }: {
   title: string;
-  subtitle: string;
   count: number;
   delayBase: number;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-12 last:mb-0">
+    <div className="mb-9 last:mb-0">
       <motion.div
         variants={reveal}
         custom={delayBase}
         initial="hidden"
         animate="show"
-        className="mb-5 flex items-baseline justify-between gap-4 border-b border-[var(--border)] pb-3"
+        className="mb-3 flex items-center gap-2 text-[10.5px] uppercase tracking-[0.24em] text-muted-foreground"
       >
-        <div className="flex items-baseline gap-3">
-          <h2
-            className="font-display text-rose"
-            style={{
-              fontSize: "22px",
-              lineHeight: 1,
-              letterSpacing: "-0.015em",
-              fontWeight: 400,
-              fontVariationSettings: '"opsz" 60, "SOFT" 60',
-            }}
-          >
-            {title}
-          </h2>
-          <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            {count}
-          </span>
-        </div>
-        <span className="hidden text-[12px] text-muted-foreground sm:block">
-          {subtitle}
-        </span>
+        <span>{title}</span>
+        <span className="text-muted-foreground/40">·</span>
+        <span className="font-mono">{count}</span>
       </motion.div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {children}
-      </div>
+      <div className="space-y-3">{children}</div>
     </div>
   );
 }
 
 function Dot() {
-  return <span className="text-[var(--lavender)]/50">·</span>;
+  return <span className="text-[var(--lavender)]/45">·</span>;
+}
+
+function Stat({ n, label }: { n: number | string; label: string }) {
+  return (
+    <span>
+      <span className="text-rose">{n}</span> {label}
+    </span>
+  );
 }
 
 function brandDisplayName(company: CompanyOut): string {
   if (company.own_brand) return company.own_brand.name;
-  // Strip trailing " Project" added by Peec project naming convention
   return company.name.replace(/\s+project$/i, "");
 }
 

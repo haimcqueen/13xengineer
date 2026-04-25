@@ -28,6 +28,8 @@ import type {
 type Props = {
   action: ActionOut;
   company: CompanyOut;
+  /** If provided, view that job's result. If omitted, kick off a new one. */
+  jobId?: string | null;
   onClose: () => void;
 };
 
@@ -39,15 +41,22 @@ const AGENT_TITLE: Record<string, string> = {
   "code-pr": "Opening pull request",
 };
 
-export default function AgentRunPanel({ action, company, onClose }: Props) {
-  const [jobId] = useState(() => startAgentRun(action, company));
-  const [job, setJob] = useState<JobOut | null>(() => getJob(jobId));
+export default function AgentRunPanel({
+  action,
+  company,
+  jobId,
+  onClose,
+}: Props) {
+  const [resolvedJobId] = useState(
+    () => jobId ?? startAgentRun(action, company),
+  );
+  const [job, setJob] = useState<JobOut | null>(() => getJob(resolvedJobId));
 
   useEffect(() => {
     let raf = 0;
     let timer = 0;
     const tick = () => {
-      const j = getJob(jobId);
+      const j = getJob(resolvedJobId);
       setJob(j);
       if (j && (j.status === "done" || j.status === "failed")) return;
       timer = window.setTimeout(() => {
@@ -59,7 +68,7 @@ export default function AgentRunPanel({ action, company, onClose }: Props) {
       cancelAnimationFrame(raf);
       clearTimeout(timer);
     };
-  }, [jobId]);
+  }, [resolvedJobId]);
 
   // Esc to close
   useEffect(() => {
