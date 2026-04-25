@@ -196,6 +196,17 @@
     transform: none !important;
   }
 
+  /* Cheap glass — same visual language as .glass but NO backdrop-filter
+     and NO mask-composite pseudo-element. The top-edge highlight is provided
+     entirely by the inset shadow inside --glass-shadow. Use this for repeated
+     surfaces (long card lists) where the heavier .glass starves the
+     compositor. */
+  .glass-flat {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
   /* Soft blue halo when a focused input lives inside a glass surface */
   .glass-focus-ring {
     transition: box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
@@ -295,6 +306,20 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .lg-clickable:hover { transform: none; }
+  }
+
+  /* Primary glass CTA — soft blue halo on hover, recedes on disabled. */
+  .glass-cta {
+    transition: box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s ease;
+  }
+  .glass-cta:hover:not(:disabled) {
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      0 0 0 1px rgba(30, 91, 201, 0.28),
+      0 0 0 5px rgba(30, 91, 201, 0.08),
+      0 24px 60px -24px rgba(31, 26, 40, 0.18),
+      0 8px 24px -12px rgba(31, 26, 40, 0.10);
+    transform: translateY(-1px);
   }
 
   /* Grain overlay — applied at app shell */

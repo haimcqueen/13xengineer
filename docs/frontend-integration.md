@@ -54,6 +54,7 @@ Events emitted, in order, on a cold resolve:
 | `prompts_loaded`   | `{ count }`                                       |
 | `brands_loaded`    | `{ count, own_brand: { name, domains[] } }`       |
 | `topics_loaded`    | `{ count }`                                       |
+| `actions_pending`  | `{}` *(emitted right before the MCP/Claude call — show a "Generating actions…" affordance; this event can take up to ~90s to resolve)* |
 | `actions_loaded`   | `{ count }`                                       |
 | `done`             | `{ company_id }`                                  |
 | `error`            | `{ message, code }` *(terminal)*                  |
