@@ -32,7 +32,8 @@ class CompanyOut(BaseModel):
 
 ActionCategory = Literal["owned_media", "earned_media"]
 Opportunity = Literal["low", "medium", "high"]
-AgentKind = Literal["article", "video", "code-pr"]
+AgentKind = Literal["article", "video", "code-pr", "improvement"]
+PlanChangeType = Literal["add", "modify", "create"]
 
 
 class ActionOut(BaseModel):
@@ -57,10 +58,41 @@ class CompanyResolveResponse(BaseModel):
 
 class AgentRunRequest(BaseModel):
     action_id: str
+    improvement_job_id: str | None = None
 
 
 class AgentRunResponse(BaseModel):
     job_id: str
+
+
+class RepoConfigIn(BaseModel):
+    site_url: str = Field(min_length=1, max_length=500)
+    repo_url: str = Field(min_length=1, max_length=500)
+    default_branch: str = "main"
+    github_token: str = Field(min_length=1, max_length=500)
+
+
+class RepoConfigOut(BaseModel):
+    company_id: str
+    site_url: str
+    repo_url: str
+    default_branch: str
+    has_token: bool
+
+
+class PlanEdit(BaseModel):
+    file_path: str
+    change_type: PlanChangeType
+    description: str
+    content: str
+    insertion_anchor: str | None = None
+
+
+class ImprovementPlan(BaseModel):
+    summary: str
+    rationale: str
+    expected_impact: str
+    edits: list[PlanEdit]
 
 
 class ProgressEvent(BaseModel):

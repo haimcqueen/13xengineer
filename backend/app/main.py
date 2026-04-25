@@ -11,8 +11,9 @@ from app.models import (  # noqa: F401 — register models
     Job,
     OAuthCredentials,
     PeecSnapshot,
+    RepoConfig,
 )
-from app.routers import agents, companies, jobs, ping
+from app.routers import agents, companies, jobs, ping, repos
 
 
 @asynccontextmanager
@@ -41,3 +42,4 @@ app.include_router(ping.router, prefix="/api")
 app.include_router(companies.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(repos.router, prefix="/api")

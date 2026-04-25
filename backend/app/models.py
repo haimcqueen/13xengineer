@@ -59,12 +59,8 @@ class Job(Base):
     kind: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String)
 
-    company_id: Mapped[str | None] = mapped_column(
-        ForeignKey("companies.id"), nullable=True
-    )
-    action_id: Mapped[str | None] = mapped_column(
-        ForeignKey("actions.id"), nullable=True
-    )
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    action_id: Mapped[str | None] = mapped_column(ForeignKey("actions.id"), nullable=True)
     agent_kind: Mapped[str | None] = mapped_column(String, nullable=True)
 
     progress: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -87,5 +83,18 @@ class OAuthCredentials(Base):
     expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
     scope: Mapped[str | None] = mapped_column(String, nullable=True)
     token_endpoint: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
+
+
+class RepoConfig(Base):
+    __tablename__ = "repo_configs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    site_url: Mapped[str] = mapped_column(String)
+    repo_url: Mapped[str] = mapped_column(String)
+    default_branch: Mapped[str] = mapped_column(String, default="main")
+    github_token: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)

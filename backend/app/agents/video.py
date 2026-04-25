@@ -6,7 +6,7 @@ from app.models import Action, Company
 class VideoAgent:
     kind = "video"
 
-    async def run(self, action: Action, company: Company) -> dict:
+    async def run(self, action: Action, company: Company, **_: object) -> dict:
         await asyncio.sleep(2)
         target = action.target or {}
         return {

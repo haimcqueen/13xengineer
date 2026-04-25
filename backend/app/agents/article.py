@@ -6,7 +6,7 @@ from app.models import Action, Company
 class ArticleAgent:
     kind = "article"
 
-    async def run(self, action: Action, company: Company) -> dict:
+    async def run(self, action: Action, company: Company, **_: object) -> dict:
         await asyncio.sleep(2)
         topic = (action.target or {}).get("topic") or "your tracked topic"
         title = action.title.replace("Publish a how-to: ", "").replace(
