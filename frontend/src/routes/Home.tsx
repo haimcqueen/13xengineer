@@ -1,39 +1,100 @@
-import { useEffect, useState } from "react"
-import { Sparkles } from "lucide-react"
+import { useMemo, useState } from "react";
+import { AnimatePresence } from "motion/react";
 
-import { Button } from "@/components/ui/button"
-import { api } from "@/lib/api"
+import Atmosphere from "@/components/Atmosphere";
+import EntryView from "@/views/EntryView";
+import InsightsView from "@/views/InsightsView";
+import NoMatchView from "@/views/NoMatchView";
+import ResolvingView from "@/views/ResolvingView";
+import { getActions, getCompany } from "@/lib/mockBackend";
+import type { ResolveError } from "@/lib/types";
 
-type Ping = { message: string }
+type View = "entry" | "resolving" | "insights" | "no-match";
 
 export default function Home() {
-  const [ping, setPing] = useState<string>("…")
-  const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<View>("entry");
+  const [input, setInput] = useState("");
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [error, setError] = useState<ResolveError | null>(null);
 
-  async function refresh() {
-    setError(null)
-    try {
-      const res = await api<Ping>("/api/ping")
-      setPing(res.message)
-    } catch (e) {
-      setError(String(e))
-    }
+  const company = useMemo(
+    () => (companyId ? getCompany(companyId) : null),
+    [companyId],
+  );
+  const actions = useMemo(
+    () => (companyId ? getActions(companyId) : []),
+    [companyId],
+  );
+
+  function submit() {
+    const v = input.trim();
+    if (!v) return;
+    setError(null);
+    setView("resolving");
   }
 
-  useEffect(() => {
-    void refresh()
-  }, [])
+  function handleResolved(id: string) {
+    setCompanyId(id);
+    setView("insights");
+  }
+
+  function handleResolveError(err: ResolveError) {
+    setError(err);
+    setView("no-match");
+  }
+
+  function reset() {
+    setView("entry");
+    setCompanyId(null);
+    setError(null);
+  }
+
+  function pickTracked(name: string) {
+    setInput(name);
+    setError(null);
+    setView("resolving");
+  }
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center gap-6 px-6">
-      <h1 className="text-4xl font-semibold tracking-tight">13xengineer</h1>
-      <p className="text-muted-foreground">
-        Backend says: <code className="rounded bg-muted px-2 py-1">{ping}</code>
-      </p>
-      {error && <p className="text-destructive text-sm">{error}</p>}
-      <Button onClick={refresh}>
-        <Sparkles /> Ping backend
-      </Button>
-    </main>
-  )
+    <>
+      <Atmosphere />
+      <main className="grain relative min-h-svh">
+        <AnimatePresence mode="popLayout" initial={false}>
+          {view === "entry" && (
+            <EntryView
+              key="entry"
+              value={input}
+              onChange={setInput}
+              onSubmit={submit}
+            />
+          )}
+          {view === "resolving" && (
+            <ResolvingView
+              key="resolving"
+              input={input}
+              onResolved={handleResolved}
+              onError={handleResolveError}
+            />
+          )}
+          {view === "insights" && company && (
+            <InsightsView
+              key="insights"
+              company={company}
+              actions={actions}
+              onReset={reset}
+            />
+          )}
+          {view === "no-match" && error && (
+            <NoMatchView
+              key="no-match"
+              error={error}
+              attemptedInput={input}
+              onPick={pickTracked}
+              onBack={reset}
+            />
+          )}
+        </AnimatePresence>
+      </main>
+    </>
+  );
 }

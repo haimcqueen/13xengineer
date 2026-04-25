@@ -5,7 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import Base, engine
-from app.routers import ping
+from app.models import (  # noqa: F401 — register models
+    Action,
+    Company,
+    Job,
+    OAuthCredentials,
+    PeecSnapshot,
+)
+from app.routers import agents, companies, jobs, ping
 
 
 @asynccontextmanager
@@ -14,7 +21,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="13xengineer API", lifespan=lifespan)
+app = FastAPI(title="Felix API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,3 +38,6 @@ def health() -> dict[str, str]:
 
 
 app.include_router(ping.router, prefix="/api")
+app.include_router(companies.router, prefix="/api")
+app.include_router(agents.router, prefix="/api")
+app.include_router(jobs.router, prefix="/api")

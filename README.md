@@ -40,6 +40,32 @@ Then open http://localhost:5173. The home page calls `GET /api/ping` through the
 - `GET /api/ping` — returns `{ "message": "pong" }`
 - `GET /docs` — FastAPI Swagger UI
 
+See `docs/frontend-integration.md` for the full Felix endpoint contract
+(company resolve, actions, agent runs, jobs).
+
+## Connecting to Peec (one-time)
+
+The backend uses Peec's REST API by default (metadata only — no Actions).
+To get real Actions via Peec's MCP server, do this once after `uv sync`:
+
+```bash
+cd backend
+uv run python -m app.scripts.connect_peec
+```
+
+This opens your browser, logs you into Peec, and stores OAuth tokens in
+SQLite. Then set `PEEC_USE_REAL_MCP=true` in the project root `.env` and
+restart uvicorn. The Action panel will be populated by Claude calling
+Peec's MCP tools rather than the Legora fixture.
+
+Required env vars (in project root `.env`):
+
+```
+PEEC_API_KEY=<your peec key>
+ANTHROPIC_API_KEY=<your anthropic key>
+PEEC_USE_REAL_MCP=false   # flip to true after running connect_peec
+```
+
 ## Adding shadcn components
 
 ```bash

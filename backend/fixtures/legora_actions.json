@@ -1,0 +1,127 @@
+{
+  "project_id": "or_f980868d-5a09-40f7-9c1d-256b991a6ba2",
+  "project_name": "Legora Project",
+  "actions": [
+    {
+      "category": "owned_media",
+      "kind": "article",
+      "title": "Publish a how-to: Reviewing multilingual contracts with Legora",
+      "rationale": "Prompts in your topic 'AI-powered document review tools' frequently mention multilingual review, but no own-domain article ranks for it. Competitors are cited via long-form how-to guides.",
+      "opportunity": "high",
+      "target": {
+        "topic": "AI-powered document review tools",
+        "format": "how-to article",
+        "competitor_gap": ["Harvey AI", "Spellbook"]
+      },
+      "suggested_agent": "article"
+    },
+    {
+      "category": "owned_media",
+      "kind": "comparison",
+      "title": "Comparison page: Legora vs Harvey AI vs Spellbook",
+      "rationale": "Competitor-comparison prompts (\"X vs Y\") are over-represented in your prompt set and currently surface third-party listicles, not your own domain.",
+      "opportunity": "high",
+      "target": {
+        "format": "comparison page",
+        "competitors": ["Harvey AI", "Spellbook"]
+      },
+      "suggested_agent": "article"
+    },
+    {
+      "category": "owned_media",
+      "kind": "listicle",
+      "title": "Listicle: Top 7 workflows AI can automate for legal teams",
+      "rationale": "AI search engines lean heavily on listicle-format pages for category overviews; you're absent from this format on your own domain.",
+      "opportunity": "medium",
+      "target": {
+        "format": "listicle",
+        "topic": "legal workflow automation"
+      },
+      "suggested_agent": "article"
+    },
+    {
+      "category": "owned_media",
+      "kind": "video",
+      "title": "Demo video: 'Reviewing a 60-page contract in under 5 minutes'",
+      "rationale": "Video demonstrations of speed/efficiency claims drive citations from review sites that quote runtimes.",
+      "opportunity": "medium",
+      "target": {
+        "format": "demo video",
+        "duration_target_seconds": 90
+      },
+      "suggested_agent": "video"
+    },
+    {
+      "category": "owned_media",
+      "kind": "code",
+      "title": "Add structured data (Product + FAQPage) to legora.com landing pages",
+      "rationale": "AI search engines heavily favor pages with schema.org markup. Your landing pages currently have only basic Organization markup.",
+      "opportunity": "high",
+      "target": {
+        "domain": "legora.com",
+        "schemas": ["Product", "FAQPage"]
+      },
+      "suggested_agent": "code-pr"
+    },
+    {
+      "category": "owned_media",
+      "kind": "code",
+      "title": "Publish an OpenGraph + JSON-LD-rich /integrations page",
+      "rationale": "Integration prompts (\"X integrates with Word/Google Docs\") often cite vendor /integrations pages. legora.com/integrations doesn't exist.",
+      "opportunity": "medium",
+      "target": {
+        "domain": "legora.com",
+        "path": "/integrations"
+      },
+      "suggested_agent": "code-pr"
+    },
+    {
+      "category": "earned_media",
+      "kind": "subreddit",
+      "title": "Engage in r/LegalTech threads on AI document review",
+      "rationale": "AI engines frequently cite Reddit threads on legaltech tooling. r/LegalTech has multiple high-traffic threads with no Legora mention.",
+      "opportunity": "medium",
+      "target": {
+        "subreddit": "LegalTech",
+        "thread_count": 4
+      },
+      "suggested_agent": null
+    },
+    {
+      "category": "earned_media",
+      "kind": "editorial",
+      "title": "Pitch case study to Legaltech News",
+      "rationale": "Legaltech News articles are repeatedly cited as sources for AI-tool roundups. A signed customer case study would close a high-value gap.",
+      "opportunity": "high",
+      "target": {
+        "publication": "Legaltech News",
+        "format": "case study"
+      },
+      "suggested_agent": null
+    },
+    {
+      "category": "earned_media",
+      "kind": "listicle_inclusion",
+      "title": "Get included in 'Best AI tools for law firms' listicles",
+      "rationale": "Of the 12 listicles AI engines cite for the category, you appear in 3. Outreach to the remaining 9 has the highest visibility ROI.",
+      "opportunity": "high",
+      "target": {
+        "category": "Best AI tools for law firms",
+        "missing_listicles": 9
+      },
+      "suggested_agent": null
+    },
+    {
+      "category": "earned_media",
+      "kind": "youtube",
+      "title": "Sponsor or co-produce a video with a legaltech YouTube channel",
+      "rationale": "Video sources are increasingly cited by Gemini and Perplexity for product evaluation queries.",
+      "opportunity": "low",
+      "target": {
+        "platform": "YouTube",
+        "channel_size_min_subs": 25000
+      },
+      "suggested_agent": null
+    }
+  ]
+}
