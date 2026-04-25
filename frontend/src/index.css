@@ -229,6 +229,18 @@
     .glass-elastic:hover { transform: none; }
   }
 
+  /* react-globe.gl tooltip: strip the default dark wrapper so our
+     custom HTML card renders cleanly. */
+  .scene-tooltip {
+    background: transparent !important;
+    color: inherit !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+    font-family: var(--font-sans) !important;
+  }
+
   /* ----- LG-CARD: 4-layer liquid glass surface (CSS-only) -----
      Architecture from sohumsuthar/liquid-glass blog post:
      - effect: backdrop-filter (blur + saturate + brightness + SVG displacement)
