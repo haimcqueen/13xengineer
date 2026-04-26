@@ -6,12 +6,13 @@ import {
   GitBranch,
   GitPullRequestArrow,
   Loader2,
-  Play,
-  Sparkles,
+  X,
 } from "lucide-react";
 
+import ActionFeed from "@/components/ActionFeed";
+import AgentConfigForm from "@/components/AgentConfigForm";
 import LGCard from "@/components/LGCard";
-import { createDeliverable } from "@/lib/deliverables";
+import { createDeliverable, useDeliverables } from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -39,11 +40,29 @@ const STAGES = [
 
 export default function StudioWebsite({ company, actions, completed }: Props) {
   const [state, setState] = useState<State>({ kind: "idle" });
+  const [configFor, setConfigFor] = useState<ActionOut | null>(null);
+  const deliverables = useDeliverables();
 
   const own = company.own_brand?.name ?? company.name;
   const repoSlug = `${(company.own_domain ?? "site").replace(/\.[^.]+$/, "")}/${(company.own_brand?.name ?? "site").toLowerCase().replace(/\s+/g, "-")}`;
 
+  function handleRun(action: ActionOut) {
+    // Already shipped → reopen the done overlay with the saved PR url.
+    const existing = deliverables.find((d) => d.action_id === action.id);
+    if (existing && existing.payload.type === "code-pr") {
+      setState({
+        kind: "done",
+        action,
+        prUrl: existing.payload.pr_url,
+      });
+      return;
+    }
+    // Otherwise show the config form first.
+    setConfigFor(action);
+  }
+
   function start(action: ActionOut) {
+    if (state.kind === "running") return;
     setState({ kind: "running", action, stage: 0 });
     let i = 0;
     const tick = () => {
@@ -51,7 +70,6 @@ export default function StudioWebsite({ company, actions, completed }: Props) {
       if (i >= STAGES.length) {
         const prUrl = `https://github.com/${repoSlug}/pull/${42 + (Math.abs(hashCode(action.id)) % 90)}`;
         setState({ kind: "done", action, prUrl });
-        // Land a Deliverable so the action card + scheduler reflect this PR.
         const schemas = (action.target.schemas as string[] | undefined) ?? [
           "Organization",
           "FAQPage",
@@ -82,7 +100,7 @@ export default function StudioWebsite({ company, actions, completed }: Props) {
       transition={{ duration: 0.45, ease }}
       className="px-10 pb-16 pt-8"
     >
-      <div className="mx-auto w-full max-w-[920px]">
+      <div className="mx-auto w-full max-w-[820px]">
         <Header
           eyebrow="Studio · Website"
           title="Optimize"
@@ -90,248 +108,231 @@ export default function StudioWebsite({ company, actions, completed }: Props) {
           subtitle="Specialist agent reads your site, ships JSON-LD, FAQ schema, and structured data — opens a PR for review."
         />
 
-        <div
-          className="grid grid-cols-1 gap-5"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) 320px" }}
-        >
-          {/* Action queue (left) */}
-          <div className="space-y-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                Recommended PRs · {actions.length}
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/65">
-                from Peec actions
-              </span>
-            </div>
-
-            {actions.length === 0 ? (
-              <Empty />
-            ) : (
-              actions.map((a, i) => {
-                const isRunning =
-                  state.kind === "running" && state.action.id === a.id;
-                const isDone =
-                  (state.kind === "done" && state.action.id === a.id) ||
-                  completed.has(a.id);
-
-                return (
-                  <motion.div
-                    key={a.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.04 * i, duration: 0.4, ease }}
-                  >
-                    <LGCard cornerRadius={18}>
-                      <div className="px-5 py-4">
-                        <div className="mb-2 flex items-center gap-2 text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-                          <span
-                            className={cn(
-                              "rounded-sm px-1.5 py-0.5 font-mono text-[9.5px] uppercase",
-                              a.opportunity === "high"
-                                ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
-                                : "bg-[var(--ink-2)]/70 text-muted-foreground",
-                            )}
-                          >
-                            {a.opportunity}
-                          </span>
-                          <span className="text-muted-foreground/65">·</span>
-                          <span className="font-mono text-muted-foreground/85">
-                            {(a.target.domain as string) ?? company.own_domain}
-                          </span>
-                        </div>
-                        <h3
-                          className="text-rose"
-                          style={{
-                            fontFamily: "var(--font-sans)",
-                            fontSize: 16,
-                            fontWeight: 500,
-                            letterSpacing: "-0.012em",
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {a.title}
-                        </h3>
-                        {a.rationale && (
-                          <p className="mt-2 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">
-                            {a.rationale}
-                          </p>
-                        )}
-
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          {Array.isArray(a.target.schemas) && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {(a.target.schemas as string[]).map((s) => (
-                                <span
-                                  key={s}
-                                  className="rounded-md border border-[var(--border)] bg-white/60 px-2 py-0.5 font-mono text-[10px] tracking-tight text-muted-foreground"
-                                >
-                                  {s}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {isDone ? (
-                            <a
-                              href={
-                                state.kind === "done" &&
-                                state.action.id === a.id
-                                  ? state.prUrl
-                                  : "#"
-                              }
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-emerald-600/95 px-3.5 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-                            >
-                              <Check className="size-3.5" strokeWidth={3} />
-                              PR opened
-                              <ExternalLink className="size-3 opacity-80" />
-                            </a>
-                          ) : isRunning ? (
-                            <button
-                              type="button"
-                              disabled
-                              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--blue)] px-3.5 py-1.5 text-[12px] font-medium text-white"
-                            >
-                              <Loader2 className="size-3.5 animate-spin" />
-                              {STAGES[state.stage] ?? "Running"}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => start(a)}
-                              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--blue)] px-3.5 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-                            >
-                              <Play className="size-3.5" strokeWidth={2.5} />
-                              Open PR
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </LGCard>
-                  </motion.div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Live agent feed (right) */}
-          <div className="space-y-3">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-              Agent activity
-            </div>
-            <LGCard cornerRadius={18}>
-              <div className="px-5 py-5">
-                <div className="mb-3 flex items-center gap-2 text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-                  <GitBranch className="size-3" />
-                  {repoSlug}
-                </div>
-                <AnimatePresence mode="wait">
-                  {state.kind === "idle" && (
-                    <motion.div
-                      key="idle"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="space-y-2"
-                    >
-                      <p className="text-[13px] leading-relaxed text-muted-foreground">
-                        Pick an action on the left. The Website agent will clone
-                        your repo, generate the structured data, and open a PR
-                        you can review and merge.
-                      </p>
-                      <div className="mt-4 rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] px-3 py-2.5 text-[11.5px] text-muted-foreground/85">
-                        Idle · waiting on a brief
-                      </div>
-                    </motion.div>
-                  )}
-                  {state.kind === "running" && (
-                    <motion.ol
-                      key="running"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-2.5"
-                    >
-                      {STAGES.map((label, i) => {
-                        const done = i < state.stage;
-                        const active = i === state.stage;
-                        return (
-                          <li
-                            key={label}
-                            className={cn(
-                              "flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/60 px-3 py-2 text-[12px]",
-                              active && "ring-1 ring-[rgba(30,91,201,0.25)]",
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "grid size-5 place-items-center rounded-full",
-                                done
-                                  ? "bg-emerald-500 text-white"
-                                  : active
-                                    ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
-                                    : "bg-[var(--ink-2)]/60 text-muted-foreground",
-                              )}
-                            >
-                              {done ? (
-                                <Check className="size-3" strokeWidth={3} />
-                              ) : active ? (
-                                <Loader2 className="size-3 animate-spin" />
-                              ) : (
-                                <span className="size-1 rounded-full bg-current opacity-40" />
-                              )}
-                            </span>
-                            <span
-                              className={cn(
-                                done
-                                  ? "text-rose/85"
-                                  : active
-                                    ? "text-rose"
-                                    : "text-muted-foreground/65",
-                              )}
-                            >
-                              {label}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </motion.ol>
-                  )}
-                  {state.kind === "done" && (
-                    <motion.div
-                      key="done"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3"
-                    >
-                      <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
-                        <Check className="size-3.5" strokeWidth={3} />
-                        PR opened on {repoSlug}
-                      </div>
-                      <a
-                        href={state.prUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex w-full items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/85 px-3 py-2.5 text-[12.5px] font-mono text-rose transition-colors hover:border-[var(--border-strong)]"
-                      >
-                        <span className="flex items-center gap-2">
-                          <GitPullRequestArrow className="size-3.5 text-[var(--blue)]" />
-                          {prShortSlug(state.prUrl)}
-                        </span>
-                        <ExternalLink className="size-3 opacity-70" />
-                      </a>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </LGCard>
-          </div>
-        </div>
+        <ActionFeed
+          actions={actions}
+          completed={completed}
+          onRun={handleRun}
+          noun={{ singular: "PR", plural: "PRs" }}
+        />
       </div>
+
+      <AnimatePresence>
+        {configFor && (
+          <AgentConfigForm
+            key={`config-${configFor.id}`}
+            open
+            agent="code-pr"
+            action={configFor}
+            onClose={() => setConfigFor(null)}
+            onGenerate={() => {
+              const a = configFor;
+              setConfigFor(null);
+              if (a) start(a);
+            }}
+          />
+        )}
+        {state.kind === "running" && (
+          <RunningOverlay
+            key="running"
+            action={state.action}
+            stage={state.stage}
+            repoSlug={repoSlug}
+          />
+        )}
+        {state.kind === "done" && (
+          <DoneOverlay
+            key="done"
+            action={state.action}
+            prUrl={state.prUrl}
+            repoSlug={repoSlug}
+            onClose={() => setState({ kind: "idle" })}
+          />
+        )}
+      </AnimatePresence>
     </motion.section>
   );
 }
+
+// ---- Overlays --------------------------------------------------------------
+
+function RunningOverlay({
+  action,
+  stage,
+  repoSlug,
+}: {
+  action: ActionOut;
+  stage: number;
+  repoSlug: string;
+}) {
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3, ease }}
+        className="fixed inset-0 z-40 bg-[rgba(31,26,40,0.42)] backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 16, scale: 0.97 }}
+        transition={{ duration: 0.45, ease }}
+        className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[520px] -translate-y-1/2"
+      >
+        <LGCard cornerRadius={22}>
+          <div className="px-7 py-7">
+            <div className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+              <GitBranch className="size-3" />
+              {repoSlug}
+            </div>
+            <h3
+              className="mb-1 text-rose"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: 17,
+                fontWeight: 500,
+                letterSpacing: "-0.012em",
+                lineHeight: 1.25,
+              }}
+            >
+              {action.title}
+            </h3>
+            <p className="mb-5 text-[12px] text-muted-foreground">
+              Website agent is opening a pull request.
+            </p>
+            <ol className="space-y-2.5">
+              {STAGES.map((label, i) => {
+                const done = i < stage;
+                const active = i === stage;
+                return (
+                  <li
+                    key={label}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/60 px-3 py-2 text-[12px]",
+                      active && "ring-1 ring-[rgba(30,91,201,0.25)]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-5 place-items-center rounded-full",
+                        done
+                          ? "bg-emerald-500 text-white"
+                          : active
+                            ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
+                            : "bg-[var(--ink-2)]/60 text-muted-foreground",
+                      )}
+                    >
+                      {done ? (
+                        <Check className="size-3" strokeWidth={3} />
+                      ) : active ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <span className="size-1 rounded-full bg-current opacity-40" />
+                      )}
+                    </span>
+                    <span
+                      className={
+                        done
+                          ? "text-rose/85"
+                          : active
+                            ? "text-rose"
+                            : "text-muted-foreground/65"
+                      }
+                    >
+                      {label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </LGCard>
+      </motion.div>
+    </>
+  );
+}
+
+function DoneOverlay({
+  action,
+  prUrl,
+  repoSlug,
+  onClose,
+}: {
+  action: ActionOut;
+  prUrl: string;
+  repoSlug: string;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3, ease }}
+        onClick={onClose}
+        className="fixed inset-0 z-40 bg-[rgba(31,26,40,0.42)] backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 16, scale: 0.97 }}
+        transition={{ duration: 0.45, ease }}
+        className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[520px] -translate-y-1/2"
+      >
+        <LGCard cornerRadius={22}>
+          <div className="px-7 pb-7 pt-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <GitBranch className="size-3" />
+                {repoSlug}
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--ink-2)]/60 hover:text-rose"
+              >
+                <X className="size-3.5" strokeWidth={1.75} />
+              </button>
+            </div>
+            <h3
+              className="mb-3 text-rose"
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: 17,
+                fontWeight: 500,
+                letterSpacing: "-0.012em",
+                lineHeight: 1.25,
+              }}
+            >
+              {action.title}
+            </h3>
+            <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
+              <Check className="size-3.5" strokeWidth={3} />
+              PR opened on {repoSlug}
+            </div>
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex w-full items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/85 px-3 py-2.5 text-[12.5px] font-mono text-rose transition-colors hover:border-[var(--border-strong)]"
+            >
+              <span className="flex items-center gap-2">
+                <GitPullRequestArrow className="size-3.5 text-[var(--blue)]" />
+                {prShortSlug(prUrl)}
+              </span>
+              <ExternalLink className="size-3 opacity-70" />
+            </a>
+          </div>
+        </LGCard>
+      </motion.div>
+    </>
+  );
+}
+
+// ---- Header ---------------------------------------------------------------
 
 function Header({
   eyebrow,
@@ -345,7 +346,7 @@ function Header({
   subtitle: string;
 }) {
   return (
-    <div className="mb-8">
+    <div className="mb-7">
       <div className="mb-3 flex items-center gap-3 text-[10.5px] uppercase tracking-[0.24em] text-muted-foreground">
         <span className="h-px w-7 bg-[var(--lavender)]/40" />
         {eyebrow}
@@ -368,25 +369,6 @@ function Header({
       <p className="mt-2 max-w-[60ch] text-[13px] text-muted-foreground">
         {subtitle}
       </p>
-    </div>
-  );
-}
-
-function Empty() {
-  return (
-    <div className="grid place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] py-14">
-      <div className="text-center">
-        <Sparkles
-          className="mx-auto mb-3 size-5 text-[var(--lavender)]/60"
-          strokeWidth={1.5}
-        />
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          empty
-        </span>
-        <p className="mt-2 max-w-[36ch] text-[13px] text-muted-foreground">
-          No website actions in this snapshot yet.
-        </p>
-      </div>
     </div>
   );
 }

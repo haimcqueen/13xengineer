@@ -75,7 +75,7 @@ export default function EntryView({ value, onChange, onSubmit }: Props) {
             transition={{ delay: 0.12, duration: 0.7, ease }}
             className="block"
           >
-            See how AI sees
+            Boost how AI sees
           </motion.span>
           <motion.em
             initial={{ opacity: 0, y: 10, filter: "blur(8px)" }}

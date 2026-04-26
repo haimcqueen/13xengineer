@@ -3,23 +3,23 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Calendar,
   Check,
-  Film,
-  Loader2,
   Pause,
   Play,
   Sparkles,
   X,
 } from "lucide-react";
 
+import ActionFeed from "@/components/ActionFeed";
+import AgentConfigForm from "@/components/AgentConfigForm";
 import LGCard from "@/components/LGCard";
 import {
   createDeliverable,
   publishDeliverable,
   scheduleDeliverable,
   useDeliverableForAction,
+  useDeliverables,
 } from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -31,52 +31,43 @@ type Props = {
 };
 
 const RENDER_STAGES: { label: string; hint: string; ms: number }[] = [
-  {
-    label: "Drafting storyboard",
-    hint: "Mapping the demo to your product surface",
-    ms: 4500,
-  },
-  {
-    label: "Selecting shots",
-    hint: "Pulling product UI takes from the canvas",
-    ms: 5500,
-  },
-  {
-    label: "Generating voice-over",
-    hint: "Writing & timing the script to picture",
-    ms: 5000,
-  },
-  {
-    label: "Animating scenes",
-    hint: "Camera, transitions, motion design",
-    ms: 6500,
-  },
-  {
-    label: "Mastering audio",
-    hint: "Mixing music bed & VO levels",
-    ms: 4500,
-  },
-  {
-    label: "Encoding 1080p",
-    hint: "Final pass · constant bitrate",
-    ms: 5000,
-  },
+  { label: "Drafting storyboard", hint: "Mapping the demo to your product surface", ms: 4500 },
+  { label: "Selecting shots", hint: "Pulling product UI takes from the canvas", ms: 5500 },
+  { label: "Generating voice-over", hint: "Writing & timing the script to picture", ms: 5000 },
+  { label: "Animating scenes", hint: "Camera, transitions, motion design", ms: 6500 },
+  { label: "Mastering audio", hint: "Mixing music bed & VO levels", ms: 4500 },
+  { label: "Encoding 1080p", hint: "Final pass · constant bitrate", ms: 5000 },
 ];
 
 const VIDEO_SRC = "/videos/jude_law.mp4";
 
 type RenderState =
   | { kind: "idle" }
-  | { kind: "rendering"; action: ActionOut; stage: number; elapsed: number }
+  | { kind: "rendering"; action: ActionOut; stage: number }
   | { kind: "ready"; action: ActionOut };
 
 export default function StudioVideo({ company, actions, completed }: Props) {
   const [state, setState] = useState<RenderState>({ kind: "idle" });
-  const [overlayOpen, setOverlayOpen] = useState(false);
+  const [previewing, setPreviewing] = useState<ActionOut | null>(null);
+  const [configFor, setConfigFor] = useState<ActionOut | null>(null);
+  const deliverables = useDeliverables();
+
+  const own = company.own_brand?.name ?? company.name;
 
   function start(action: ActionOut) {
     if (state.kind !== "idle") return;
-    setState({ kind: "rendering", action, stage: 0, elapsed: 0 });
+    setState({ kind: "rendering", action, stage: 0 });
+  }
+
+  function handleRun(action: ActionOut) {
+    // Already shipped → reopen the big reveal with the saved video.
+    const existing = deliverables.find((d) => d.action_id === action.id);
+    if (existing) {
+      setPreviewing(action);
+      return;
+    }
+    // Otherwise show the config form first.
+    setConfigFor(action);
   }
 
   // Drive the multi-stage render
@@ -85,9 +76,9 @@ export default function StudioVideo({ company, actions, completed }: Props) {
     const stage = state.stage;
     if (stage >= RENDER_STAGES.length) {
       setState({ kind: "ready", action: state.action });
-      setOverlayOpen(true);
-      // Land a Deliverable so it shows up in Scheduler & on the action card.
-      const own = company.own_brand?.name ?? company.name;
+      // Open the big reveal automatically.
+      setPreviewing(state.action);
+      const ownName = company.own_brand?.name ?? company.name;
       createDeliverable(state.action, {
         type: "video",
         title: state.action.title,
@@ -97,7 +88,7 @@ export default function StudioVideo({ company, actions, completed }: Props) {
         thumbnail_url: "",
         storyboard: [
           "Open on contract document on screen",
-          `Cut to ${own} interface — start review`,
+          `Cut to ${ownName} interface — start review`,
           "Highlight key clauses being flagged",
           "Show timer · 4:32 elapsed",
           "Closing VO + CTA card",
@@ -107,19 +98,18 @@ export default function StudioVideo({ company, actions, completed }: Props) {
     }
     const t = window.setTimeout(() => {
       setState((s) =>
-        s.kind === "rendering"
-          ? { ...s, stage: s.stage + 1, elapsed: s.elapsed + RENDER_STAGES[stage].ms }
-          : s,
+        s.kind === "rendering" ? { ...s, stage: s.stage + 1 } : s,
       );
     }, RENDER_STAGES[stage].ms);
     return () => window.clearTimeout(t);
   }, [state, company]);
 
   const totalMs = RENDER_STAGES.reduce((acc, s) => acc + s.ms, 0);
-  const elapsed = state.kind === "rendering" ? state.elapsed : state.kind === "ready" ? totalMs : 0;
+  const elapsed =
+    state.kind === "rendering"
+      ? RENDER_STAGES.slice(0, state.stage).reduce((acc, s) => acc + s.ms, 0)
+      : 0;
   const progress = Math.min(1, elapsed / totalMs);
-
-  const own = company.own_brand?.name ?? company.name;
 
   return (
     <motion.section
@@ -129,7 +119,7 @@ export default function StudioVideo({ company, actions, completed }: Props) {
       transition={{ duration: 0.45, ease }}
       className="px-10 pb-16 pt-8"
     >
-      <div className="mx-auto w-full max-w-[920px]">
+      <div className="mx-auto w-full max-w-[820px]">
         <Header
           eyebrow="Studio · Video"
           title="Demo videos for"
@@ -137,237 +127,45 @@ export default function StudioVideo({ company, actions, completed }: Props) {
           subtitle="Specialist agent storyboards, animates, and renders feature demos. Heavy lift — give it a minute."
         />
 
-        <div
-          className="grid grid-cols-1 gap-5"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) 320px" }}
-        >
-          {/* Briefs (left) */}
-          <div className="space-y-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                Recommended demos · {actions.length}
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/65">
-                from Peec actions
-              </span>
-            </div>
-
-            {actions.length === 0 ? (
-              <Empty />
-            ) : (
-              actions.map((a, i) => {
-                const isRunning =
-                  state.kind === "rendering" && state.action.id === a.id;
-                const isReady =
-                  state.kind === "ready" && state.action.id === a.id;
-                const isDone = isReady || completed.has(a.id);
-                return (
-                  <motion.div
-                    key={a.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 * i, duration: 0.4, ease }}
-                  >
-                    <LGCard cornerRadius={18}>
-                      <div className="px-5 py-4">
-                        <div className="mb-2 flex items-center gap-2 text-[10.5px] uppercase tracking-[0.22em] text-muted-foreground">
-                          <Film className="size-3" />
-                          {(a.target.feature_focus as string) ?? "Demo video"}
-                          <span className="text-muted-foreground/65">·</span>
-                          <span className="font-mono text-muted-foreground/85">
-                            {(a.target.duration_target_seconds as number) ?? 90}s
-                          </span>
-                        </div>
-                        <h3
-                          className="text-rose"
-                          style={{
-                            fontFamily: "var(--font-sans)",
-                            fontSize: 16,
-                            fontWeight: 500,
-                            letterSpacing: "-0.012em",
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {a.title}
-                        </h3>
-                        {a.rationale && (
-                          <p className="mt-2 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">
-                            {a.rationale}
-                          </p>
-                        )}
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                            <span
-                              className={cn(
-                                "rounded-sm px-1.5 py-0.5",
-                                a.opportunity === "high"
-                                  ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
-                                  : "bg-[var(--ink-2)]/70 text-muted-foreground",
-                              )}
-                            >
-                              {a.opportunity}
-                            </span>
-                          </div>
-                          {isDone ? (
-                            <button
-                              type="button"
-                              onClick={() => setOverlayOpen(true)}
-                              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-emerald-600/95 px-3.5 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-                            >
-                              <Play className="size-3.5" strokeWidth={3} />
-                              Preview
-                            </button>
-                          ) : isRunning ? (
-                            <button
-                              type="button"
-                              disabled
-                              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--blue)] px-3.5 py-1.5 text-[12px] font-medium text-white"
-                            >
-                              <Loader2 className="size-3.5 animate-spin" />
-                              Rendering
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => start(a)}
-                              disabled={state.kind !== "idle"}
-                              className={cn(
-                                "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3.5 py-1.5 text-[12px] font-medium transition-opacity",
-                                state.kind === "idle"
-                                  ? "bg-[var(--blue)] text-white hover:opacity-90"
-                                  : "cursor-not-allowed bg-[var(--ink-2)]/70 text-muted-foreground",
-                              )}
-                            >
-                              <Play className="size-3.5" strokeWidth={2.5} />
-                              Render
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </LGCard>
-                  </motion.div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Render console (right) */}
-          <div className="space-y-3">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-              Render console
-            </div>
-            <LGCard cornerRadius={18}>
-              <div className="px-5 py-5">
-                <AnimatePresence mode="wait">
-                  {state.kind === "idle" && (
-                    <motion.div
-                      key="idle"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-3"
-                    >
-                      <p className="text-[13px] leading-relaxed text-muted-foreground">
-                        Click "Render" on a brief. The Video agent will compose
-                        a 90-second demo from your product UI.
-                      </p>
-                      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] px-3 py-2.5 text-[11.5px] text-muted-foreground/85">
-                        Idle
-                      </div>
-                    </motion.div>
-                  )}
-                  {state.kind === "rendering" && (
-                    <motion.div
-                      key="rendering"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.6, ease }}
-                      className="-mx-5 -my-5"
-                    >
-                      <div className="px-7 pb-6 pt-7">
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={state.stage}
-                            initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-                            animate={{
-                              opacity: 1,
-                              y: 0,
-                              filter: "blur(0px)",
-                            }}
-                            exit={{
-                              opacity: 0,
-                              y: -6,
-                              filter: "blur(4px)",
-                              transition: { duration: 0.4, ease },
-                            }}
-                            transition={{ duration: 0.6, ease }}
-                          >
-                            <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
-                              <span
-                                className="size-1 rounded-full bg-[var(--blue)]"
-                                style={{
-                                  boxShadow:
-                                    "0 0 0 4px rgba(30,91,201,0.16)",
-                                  animation:
-                                    "lg-pulse 2.4s ease-in-out infinite",
-                                }}
-                              />
-                              Step {state.stage + 1} · {RENDER_STAGES.length}
-                            </div>
-                            <h3
-                              className="text-rose"
-                              style={{
-                                fontFamily: "var(--font-sans)",
-                                fontSize: 22,
-                                fontWeight: 500,
-                                letterSpacing: "-0.022em",
-                                lineHeight: 1.1,
-                              }}
-                            >
-                              {RENDER_STAGES[state.stage]?.label}
-                            </h3>
-                            {RENDER_STAGES[state.stage]?.hint && (
-                              <p className="mt-2 text-[12px] tracking-[-0.005em] text-muted-foreground">
-                                {RENDER_STAGES[state.stage]?.hint}
-                              </p>
-                            )}
-                          </motion.div>
-                        </AnimatePresence>
-                      </div>
-                      <div className="relative h-px w-full overflow-hidden bg-[var(--border)]/70">
-                        <motion.div
-                          className="absolute inset-y-0 left-0 bg-[var(--blue)]"
-                          animate={{ width: `${progress * 100}%` }}
-                          transition={{ duration: 0.6, ease }}
-                        />
-                      </div>
-                      <style>{`@keyframes lg-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.55}}`}</style>
-                    </motion.div>
-                  )}
-                  {state.kind === "ready" && (
-                    <motion.div
-                      key="ready"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3"
-                    >
-                      <ReadyConsole
-                        action={state.action}
-                        onPreview={() => setOverlayOpen(true)}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </LGCard>
-          </div>
-        </div>
+        <ActionFeed
+          actions={actions}
+          completed={completed}
+          onRun={handleRun}
+          noun={{ singular: "video", plural: "videos" }}
+        />
       </div>
 
       <AnimatePresence>
-        {overlayOpen && state.kind === "ready" && (
-          <BigReveal
+        {configFor && (
+          <AgentConfigForm
+            key={`config-${configFor.id}`}
+            open
+            agent="video"
+            action={configFor}
+            onClose={() => setConfigFor(null)}
+            onGenerate={() => {
+              const a = configFor;
+              setConfigFor(null);
+              if (a) start(a);
+            }}
+          />
+        )}
+        {state.kind === "rendering" && (
+          <RenderOverlay
+            key="rendering"
             action={state.action}
-            onClose={() => setOverlayOpen(false)}
+            stage={state.stage}
+            progress={progress}
+          />
+        )}
+        {previewing && (
+          <BigReveal
+            key="preview"
+            action={previewing}
+            onClose={() => {
+              setPreviewing(null);
+              if (state.kind === "ready") setState({ kind: "idle" });
+            }}
           />
         )}
       </AnimatePresence>
@@ -375,9 +173,96 @@ export default function StudioVideo({ company, actions, completed }: Props) {
   );
 }
 
-// ----------------------------------------------------------------------------
-// Big full-screen reveal — the wow moment
-// ----------------------------------------------------------------------------
+// ---- Render overlay -------------------------------------------------------
+
+function RenderOverlay({
+  action,
+  stage,
+  progress,
+}: {
+  action: ActionOut;
+  stage: number;
+  progress: number;
+}) {
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3, ease }}
+        className="fixed inset-0 z-40 bg-[rgba(31,26,40,0.42)] backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 16, scale: 0.97 }}
+        transition={{ duration: 0.45, ease }}
+        className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[480px] -translate-y-1/2"
+      >
+        <LGCard cornerRadius={22}>
+          <div className="px-7 py-7">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground line-clamp-1">
+              {action.title}
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={stage}
+                initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{
+                  opacity: 0,
+                  y: -6,
+                  filter: "blur(4px)",
+                  transition: { duration: 0.4, ease },
+                }}
+                transition={{ duration: 0.6, ease }}
+              >
+                <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                  <span
+                    className="size-1 rounded-full bg-[var(--blue)]"
+                    style={{
+                      boxShadow: "0 0 0 4px rgba(30,91,201,0.16)",
+                      animation: "lg-pulse 2.4s ease-in-out infinite",
+                    }}
+                  />
+                  Step {stage + 1} · {RENDER_STAGES.length}
+                </div>
+                <h3
+                  className="text-rose"
+                  style={{
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 22,
+                    fontWeight: 500,
+                    letterSpacing: "-0.022em",
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {RENDER_STAGES[stage]?.label}
+                </h3>
+                {RENDER_STAGES[stage]?.hint && (
+                  <p className="mt-2 text-[12px] tracking-[-0.005em] text-muted-foreground">
+                    {RENDER_STAGES[stage]?.hint}
+                  </p>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+          <div className="relative h-px w-full overflow-hidden bg-[var(--border)]/70">
+            <motion.div
+              className="absolute inset-y-0 left-0 bg-[var(--blue)]"
+              animate={{ width: `${progress * 100}%` }}
+              transition={{ duration: 0.6, ease }}
+            />
+          </div>
+          <style>{`@keyframes lg-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.55}}`}</style>
+        </LGCard>
+      </motion.div>
+    </>
+  );
+}
+
+// ---- Big reveal ------------------------------------------------------------
 
 function BigReveal({
   action,
@@ -388,6 +273,7 @@ function BigReveal({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(true);
+  const deliverable = useDeliverableForAction(action.id);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -422,6 +308,21 @@ function BigReveal({
     }
   }
 
+  function handleSchedule() {
+    if (!deliverable) return;
+    const when = new Date();
+    when.setDate(when.getDate() + 1);
+    when.setHours(10, 0, 0, 0);
+    scheduleDeliverable(deliverable.id, when);
+  }
+
+  function handlePublish() {
+    if (!deliverable) return;
+    publishDeliverable(deliverable.id, "LinkedIn");
+  }
+
+  const status = deliverable?.status ?? "draft";
+
   return (
     <>
       <motion.div
@@ -443,7 +344,7 @@ function BigReveal({
           <div className="mb-3 flex items-center justify-between gap-4">
             <div>
               <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.24em] text-white/60">
-                Video · ready
+                Video · {status}
               </div>
               <h2
                 className="text-white"
@@ -503,108 +404,49 @@ function BigReveal({
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2.5">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-white px-4 py-2 text-[12.5px] font-medium text-[#1F1A28] transition-opacity hover:opacity-90"
-            >
-              <Calendar className="size-3.5" />
-              Schedule release
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-white/25 bg-white/5 px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-white/15"
-            >
-              Download MP4
-            </button>
+            {status === "draft" && (
+              <button
+                type="button"
+                onClick={handleSchedule}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-white px-4 py-2 text-[12.5px] font-medium text-[#1F1A28] transition-opacity hover:opacity-90"
+              >
+                <Calendar className="size-3.5" />
+                Schedule release
+              </button>
+            )}
+            {status === "draft" && (
+              <button
+                type="button"
+                onClick={handlePublish}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-white/25 bg-white/5 px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-white/15"
+              >
+                <Sparkles className="size-3.5" />
+                Publish to social
+              </button>
+            )}
+            {status === "scheduled" && deliverable?.scheduled_at && (
+              <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-white/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-white/85">
+                <Calendar className="size-3.5" />
+                Scheduled ·{" "}
+                {new Date(deliverable.scheduled_at).toLocaleString("en-US", {
+                  weekday: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+            {status === "published" && (
+              <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-emerald-500/90 px-4 py-2 text-[12.5px] font-medium text-white">
+                <Check className="size-3.5" strokeWidth={3} />
+                Live · {deliverable?.destination ?? "social"}
+              </span>
+            )}
             <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.24em] text-white/55">
               press space to play · esc to close
             </span>
           </div>
         </div>
       </motion.div>
-    </>
-  );
-}
-
-function ReadyConsole({
-  action,
-  onPreview,
-}: {
-  action: ActionOut;
-  onPreview: () => void;
-}) {
-  const deliverable = useDeliverableForAction(action.id);
-  const status = deliverable?.status ?? "draft";
-
-  function handleSchedule() {
-    if (!deliverable) return;
-    const when = new Date();
-    when.setDate(when.getDate() + 1);
-    when.setHours(10, 0, 0, 0);
-    scheduleDeliverable(deliverable.id, when);
-  }
-
-  function handlePublish() {
-    if (!deliverable) return;
-    publishDeliverable(deliverable.id, "LinkedIn");
-  }
-
-  return (
-    <>
-      <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
-        <Check className="size-3.5" strokeWidth={3} />
-        Render complete · 1080p
-      </div>
-      <button
-        type="button"
-        onClick={onPreview}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--blue)] px-3 py-2.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
-      >
-        <Play className="size-3.5" strokeWidth={2.5} />
-        Open big preview
-      </button>
-      {status === "draft" && (
-        <>
-          <button
-            type="button"
-            onClick={handleSchedule}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/80 px-3 py-2.5 text-[12.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
-          >
-            <Calendar className="size-3.5" />
-            Schedule release
-          </button>
-          <button
-            type="button"
-            onClick={handlePublish}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/80 px-3 py-2.5 text-[12.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
-          >
-            <Sparkles className="size-3.5" />
-            Publish to social
-          </button>
-        </>
-      )}
-      {status === "scheduled" && (
-        <div className="rounded-[var(--radius-md)] border border-[rgba(30,91,201,0.25)] bg-[rgba(30,91,201,0.06)] px-3 py-2.5 text-[12px] text-[var(--blue)]">
-          <div className="flex items-center gap-2 font-medium">
-            <Calendar className="size-3.5" />
-            Scheduled
-          </div>
-          <div className="mt-0.5 font-mono text-[11px]">
-            {deliverable?.scheduled_at &&
-              new Date(deliverable.scheduled_at).toLocaleString("en-US", {
-                weekday: "short",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-          </div>
-        </div>
-      )}
-      {status === "published" && (
-        <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
-          <Check className="size-3.5" strokeWidth={3} />
-          Published · {deliverable?.destination ?? "live"}
-        </div>
-      )}
     </>
   );
 }
@@ -621,7 +463,7 @@ function Header({
   subtitle: string;
 }) {
   return (
-    <div className="mb-8">
+    <div className="mb-7">
       <div className="mb-3 flex items-center gap-3 text-[10.5px] uppercase tracking-[0.24em] text-muted-foreground">
         <span className="h-px w-7 bg-[var(--lavender)]/40" />
         {eyebrow}
@@ -644,25 +486,6 @@ function Header({
       <p className="mt-2 max-w-[60ch] text-[13px] text-muted-foreground">
         {subtitle}
       </p>
-    </div>
-  );
-}
-
-function Empty() {
-  return (
-    <div className="grid place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] py-14">
-      <div className="text-center">
-        <Sparkles
-          className="mx-auto mb-3 size-5 text-[var(--lavender)]/60"
-          strokeWidth={1.5}
-        />
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          empty
-        </span>
-        <p className="mt-2 max-w-[36ch] text-[13px] text-muted-foreground">
-          No video briefs in this snapshot yet.
-        </p>
-      </div>
     </div>
   );
 }

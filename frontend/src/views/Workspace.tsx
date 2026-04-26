@@ -226,20 +226,6 @@ function ActionsView({
   const shippedCount = inFlight.length;
   const progress = total > 0 ? shippedCount / total : 0;
 
-  // One-liner context: visibility, position, gap.
-  const ownStat = company.brand_stats?.find((b) => b.is_own) ?? null;
-  const leaderStat = useMemo(() => {
-    if (!company.brand_stats) return null;
-    const s = [...company.brand_stats].sort(
-      (a, b) => b.visibility - a.visibility,
-    );
-    return s[0]?.is_own ? s[1] : s[0];
-  }, [company.brand_stats]);
-  const gapPp =
-    ownStat && leaderStat
-      ? Math.round((ownStat.visibility - leaderStat.visibility) * 100)
-      : null;
-
   return (
     <motion.section
       initial={{ opacity: 0, y: 12 }}
@@ -274,21 +260,6 @@ function ActionsView({
               {brandName(company)}
             </span>
           </h1>
-          {ownStat && (
-            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Visibility {Math.round(ownStat.visibility * 100)}% ·
-              {" "}position #{ownStat.position.toFixed(1)}
-              {gapPp !== null && leaderStat ? (
-                <>
-                  {" "}·{" "}
-                  <span className={gapPp < 0 ? "text-[#b04a3a]" : "text-emerald-700"}>
-                    {gapPp >= 0 ? "+" : ""}
-                    {gapPp}pp vs {leaderStat.brand_name}
-                  </span>
-                </>
-              ) : null}
-            </p>
-          )}
         </div>
 
         {/* Progress strip */}
