@@ -330,7 +330,7 @@ function VideoConfig({
   action: ActionOut;
 }) {
   const featureFocus =
-    (action.target.feature_focus as string | undefined) ?? "Product demo";
+    (action.target.feature_focus as string | undefined) ?? "Thought leadership";
   return (
     <div className="space-y-5">
       <Field label="Duration">

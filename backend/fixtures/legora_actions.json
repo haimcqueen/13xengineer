@@ -14,46 +14,49 @@
   "actions": [
     {
       "category": "owned_media",
-      "kind": "listicle",
-      "title": "Publish a 'Best Legal AI Tools 2026' listicle on legora.com",
-      "rationale": "OWNED·LISTICLE has the highest opportunity score (3/3) across the entire dataset. AI engines cite legal-AI listicles 4,704 times in the last 30 days; Legora appears in zero of them. Spellbook's listicle at spellbook.legal/learn/legal-ai-tools is retrieved in 879 chats — the single most-cited URL in the category.",
+      "kind": "article",
+      "title": "Publish 'AI Document Review for M&A Due Diligence: What Actually Works'",
+      "rationale": "Buyers searching 'AI document review M&A due diligence' are mid-deal evaluators with high commercial intent — and Legora is invisible on this query. The article opens on a $1.5M tax liability hidden by a fabricated AI citation (Bloomberg, Apr 2026), grounds the case for AI in McKinsey's 20% cost / 30-50% faster cycle data, and ends with the practitioner's checklist firms ask for. OWNED·ARTICLE shows 67% gap across 2,841 due-diligence citations.",
       "opportunity": "high",
       "target": {
-        "format": "listicle",
-        "model_url": "https://spellbook.legal/learn/legal-ai-tools",
-        "model_title": "9 Best Legal AI Tools for Lawyers in 2026 (Most Recommended)",
-        "topic": "Best ai tools",
-        "citations_in_category": 4704
-      },
-      "suggested_agent": "article"
-    },
-    {
-      "category": "owned_media",
-      "kind": "comparison",
-      "title": "Ship legora.com/vs-harvey comparison page",
-      "rationale": "OWNED·COMPARISON has 0% Legora coverage across 1,417 comparison-page citations. The leading comparison page right now is competitor-published: spellbook.legal/briefs/legora-vs-harvey gets retrieved in 285 chats and cited 558 times — Spellbook is literally writing the answer to 'Legora vs Harvey' for LLMs.",
-      "opportunity": "high",
-      "target": {
-        "format": "comparison page",
-        "competitors": ["Harvey", "Spellbook"],
-        "model_url": "https://spellbook.legal/briefs/legora-vs-harvey",
-        "model_title": "Legora vs Harvey: Which Is The Top Pick in 2026?",
-        "citations_in_category": 1417
+        "format": "article",
+        "topic": "AI document review M&A due diligence",
+        "audience": "M&A practitioners · GCs · deal counsel",
+        "draft_slug": "ai-document-review-ma-due-diligence",
+        "citations_in_category": 2841,
+        "publish_target": "legora.com/blog"
       },
       "suggested_agent": "article"
     },
     {
       "category": "owned_media",
       "kind": "article",
-      "title": "Ship legora.com/harvey-alternatives landing page",
-      "rationale": "OWNED·ALTERNATIVE has 0% Legora coverage across 394 'X alternatives' page citations. Spellbook's '5 Best Harvey AI Alternatives for 2026' (spellbook.legal/briefs/harvey-alternatives) is the canonical answer LLMs return when buyers search for Harvey alternatives.",
+      "title": "Publish 'How to Evaluate Legal AI Tools: A 6-Dimension Framework'",
+      "rationale": "Individual lawyer AI adoption hit 69% in 2026 but only 34% of firms have formally adopted — managing partners are searching for a structured way to evaluate vendors. The article reframes evaluation around the dimensions that predict ROI (workflow integration, adoption, accuracy, security, cost, vendor quality) instead of a feature checklist. OWNED·ARTICLE shows 1,932 citations on this evaluation intent and Legora appears in zero of them.",
       "opportunity": "high",
       "target": {
-        "format": "alternatives landing page",
-        "model_url": "https://spellbook.legal/briefs/harvey-alternatives",
-        "model_title": "5 Best Harvey AI Alternatives for 2026",
-        "competitor_to_displace": "Harvey",
-        "citations_in_category": 394
+        "format": "article",
+        "topic": "evaluate legal AI tools framework",
+        "audience": "managing partners · innovation leads · IT decision-makers",
+        "draft_slug": "evaluate-legal-ai-tools-framework",
+        "citations_in_category": 1932,
+        "publish_target": "legora.com/blog"
+      },
+      "suggested_agent": "article"
+    },
+    {
+      "category": "owned_media",
+      "kind": "article",
+      "title": "Publish 'Outside Counsel Guidelines Are Getting Stricter — Here's How Firms Are Adapting'",
+      "rationale": "50% of in-house teams now believe they're being overbilled, 79% are under pressure to cut spend, and OCGs have started covering AI disclosure, e-billing automation and mandatory AFAs. This article extends the 'billable hour' video into operational territory and is the natural pull-through for firms reading Kyle's piece. OWNED·ARTICLE shows 1,247 citations on OCG-AI intent — a topic where Legora's Word Add-in / governance story has a clear claim.",
+      "opportunity": "high",
+      "target": {
+        "format": "article",
+        "topic": "outside counsel guidelines AI",
+        "audience": "law firm partners · legal ops · GCs",
+        "draft_slug": "outside-counsel-guidelines-firms-adapting",
+        "citations_in_category": 1247,
+        "publish_target": "legora.com/blog"
       },
       "suggested_agent": "article"
     },
@@ -72,29 +75,19 @@
     },
     {
       "category": "owned_media",
-      "kind": "article",
-      "title": "Write 'Harvey AI Alternatives: Legal AI for Law Firms' style article",
-      "rationale": "OWNED·ARTICLE has 67% gap on 1,474 article citations. Clio's clio.com/blog/harvey-ai-legal is cited heavily — it's the model template for an own-domain article that ranks for Harvey-comparison intent.",
-      "opportunity": "medium",
-      "target": {
-        "format": "article",
-        "model_url": "https://clio.com/blog/harvey-ai-legal",
-        "model_title": "Harvey AI Alternatives: Legal AI for Law Firms",
-        "topic": "Harvey legal ai"
-      },
-      "suggested_agent": "article"
-    },
-    {
-      "category": "owned_media",
       "kind": "video",
-      "title": "Produce a 90-second demo: 'Reviewing 5,000 contracts in 2 minutes with Tabular Review'",
-      "rationale": "UGC·YouTube currently has 80% gap when filtered to Legora — Sam Mollaei, Esq. (legaltech YouTube channel) and similar creators publish demo-style videos that LLMs cite heavily. Tabular Review is Legora's strongest differentiator vs Harvey.",
+      "title": "Turn 'The billable hour isn't dying — AI is transforming it' into a 90-second explainer",
+      "rationale": "Kyle Poe's Mar 25 piece on legora.com/blog/the-billable-hour-isnt-dying-but-ai-is-transforming-it makes a sharp, citable argument: AI doesn't kill the billable hour, it makes work predictable enough to price as fixed fees (72% of firms already offer alternatives, 90% at firms 50+ lawyers). UGC·YouTube and LinkedIn show 80% gap for this thesis — re-cutting the article as video opens a second citation surface for the same data points.",
       "opportunity": "medium",
       "target": {
-        "format": "demo video",
+        "format": "thought-leadership video",
         "duration_target_seconds": 90,
-        "feature_focus": "Tabular Review",
-        "publish_targets": ["legora.com/product", "youtube.com"]
+        "source_article_url": "https://legora.com/blog/the-billable-hour-isnt-dying-but-ai-is-transforming-it",
+        "source_author": "Kyle Poe",
+        "source_published_at": "2026-03-25",
+        "feature_focus": "Billable hour, transformed",
+        "topic": "Billable hour · AI pricing",
+        "publish_targets": ["legora.com/blog", "youtube.com", "linkedin.com"]
       },
       "suggested_agent": "video"
     },

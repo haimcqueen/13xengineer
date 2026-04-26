@@ -465,6 +465,11 @@ const ARTICLE_SLUGS = [
 ] as const;
 
 function articleSlugFor(action: ActionOut, all: ActionOut[]): string {
+  // Prefer explicit pin from the action's target metadata when set.
+  const pinned = action.target.draft_slug as string | undefined;
+  if (pinned && (ARTICLE_SLUGS as readonly string[]).includes(pinned)) {
+    return pinned;
+  }
   const text = `${action.title} ${action.rationale ?? ""}`.toLowerCase();
   if (/(due[ -]diligence|m&a|document review)/.test(text)) {
     return "ai-document-review-ma-due-diligence";

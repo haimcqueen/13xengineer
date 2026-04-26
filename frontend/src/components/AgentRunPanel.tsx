@@ -634,7 +634,7 @@ function VideoConfig({
   action: ActionOut;
 }) {
   const featureFocus =
-    (action.target.feature_focus as string | undefined) ?? "Product demo";
+    (action.target.feature_focus as string | undefined) ?? "Thought leadership";
   return (
     <div className="space-y-5">
       <Field label="Duration">
@@ -1338,15 +1338,15 @@ function streamItemsForStage(
       return [
         `Format · ${config.duration} ${config.aspect}`,
         `Voiceover · ${config.voiceover === "none" ? "muted" : config.voiceover}`,
-        "Drafted 6-beat script · 142 words",
-        "Hook: contract review at scale",
+        "Drafted 6-beat script · 138 words",
+        "Hook: the billable hour isn't dying",
       ];
     if (stage === 1)
       return [
-        "Selected take · product canvas wide shot",
-        "Selected take · tabular review zoom",
-        "Selected take · clause flagging detail",
-        "Selected take · timer overlay (4:32)",
+        "Selected take · clock motif open",
+        "Selected take · pull-quote · Kyle Poe",
+        "Selected take · stat reveal · 72% / 90%",
+        "Selected take · Big Four accounting analogy",
       ];
     if (stage === 2)
       return [

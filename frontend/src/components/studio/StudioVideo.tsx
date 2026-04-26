@@ -78,7 +78,6 @@ export default function StudioVideo({ company, actions, completed }: Props) {
       setState({ kind: "ready", action: state.action });
       // Open the big reveal automatically.
       setPreviewing(state.action);
-      const ownName = company.own_brand?.name ?? company.name;
       createDeliverable(state.action, {
         type: "video",
         title: state.action.title,
@@ -87,11 +86,12 @@ export default function StudioVideo({ company, actions, completed }: Props) {
         video_url: VIDEO_SRC,
         thumbnail_url: "",
         storyboard: [
-          "Open on contract document on screen",
-          `Cut to ${ownName} interface — start review`,
-          "Highlight key clauses being flagged",
-          "Show timer · 4:32 elapsed",
-          "Closing VO + CTA card",
+          "Open on a clock — \"the billable hour isn't dying\"",
+          "Pull-quote from Kyle Poe · Legora · Mar 25, 2026",
+          "Stat reveal · 72% of firms offer alternative fee arrangements",
+          "Stat reveal · 90% at firms with 50+ lawyers",
+          "Analogy · Big Four accounting's shift to fixed fees",
+          "Close · billable hour stays for high-stakes work, fixed fees take routine",
         ],
       });
       return;
@@ -122,9 +122,9 @@ export default function StudioVideo({ company, actions, completed }: Props) {
       <div className="mx-auto w-full max-w-[820px]">
         <Header
           eyebrow="Studio · Video"
-          title="Demo videos for"
+          title="Videos for"
           accent={own}
-          subtitle="Specialist agent storyboards, animates, and renders feature demos. Heavy lift — give it a minute."
+          subtitle="Specialist agent re-cuts your strongest written thinking into short, citable video. Heavy lift — give it a minute."
         />
 
         <ActionFeed
