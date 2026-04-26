@@ -297,19 +297,19 @@ function ActionsView({
                   onClick={() => setFilter("all")}
                 />
                 <FilterChip
-                  label="Article"
+                  label="Tolkien"
                   count={counts.article}
                   active={filter === "article"}
                   onClick={() => setFilter("article")}
                 />
                 <FilterChip
-                  label="Video"
+                  label="Nolan"
                   count={counts.video}
                   active={filter === "video"}
                   onClick={() => setFilter("video")}
                 />
                 <FilterChip
-                  label="Website"
+                  label="Michelangelo"
                   count={counts["code-pr"]}
                   active={filter === "code-pr"}
                   onClick={() => setFilter("code-pr")}
@@ -418,9 +418,9 @@ function ProgressStrip({
 // ----- Hero "next up" --------------------------------------------------------
 
 const HERO_VERB: Record<string, string> = {
-  article: "Deploy Article agent",
-  video: "Deploy Video agent",
-  "code-pr": "Deploy Website agent",
+  article: "Deploy Tolkien",
+  video: "Deploy Nolan",
+  "code-pr": "Deploy Michelangelo",
   manual: "Open brief",
 };
 
@@ -740,10 +740,14 @@ function FilterEmptyHero({
 }) {
   const label =
     filter === "code-pr"
-      ? "website actions"
-      : filter === "manual"
-        ? "manual briefs"
-        : `${filter} actions`;
+      ? "Michelangelo actions"
+      : filter === "video"
+        ? "Nolan actions"
+        : filter === "article"
+          ? "Tolkien actions"
+          : filter === "manual"
+            ? "manual briefs"
+            : "actions";
   return (
     <div className="grid place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] py-10 text-center">
       <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -827,10 +831,14 @@ function FilterEmpty({ filter }: { filter: Filter }) {
     filter === "all"
       ? "actions"
       : filter === "code-pr"
-        ? "website actions"
-        : filter === "manual"
-          ? "manual briefs"
-          : `${filter} actions`;
+        ? "Michelangelo actions"
+        : filter === "video"
+          ? "Nolan actions"
+          : filter === "article"
+            ? "Tolkien actions"
+            : filter === "manual"
+              ? "manual briefs"
+              : "actions";
   return (
     <div className="grid place-items-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] py-20">
       <div className="text-center">

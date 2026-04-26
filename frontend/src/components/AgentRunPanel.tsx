@@ -13,6 +13,8 @@ import {
   GitPullRequestArrow,
   Loader2,
   Lock,
+  Maximize2,
+  Minimize2,
   Pause,
   Play,
   Send,
@@ -762,7 +764,7 @@ function WebsiteConfig({
           GitHub access required
         </div>
         <p className="text-[12px] leading-relaxed text-rose/85">
-          The Website agent clones your repo, generates the structured-data
+          Michelangelo clones your repo, generates the structured-data
           edits, and opens a real PR. We need a personal access token with{" "}
           <code className="font-mono text-[11px]">repo</code> scope.
         </p>
@@ -1644,6 +1646,8 @@ function ResultBody({ result }: { result: AgentResult }) {
 
 function SiteBlogBody({ result }: { result: SiteBlogResult }) {
   const [iframeReady, setIframeReady] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
   const displayHost = (() => {
     try {
       return new URL(result.publish_url).host;
@@ -1658,6 +1662,16 @@ function SiteBlogBody({ result }: { result: SiteBlogResult }) {
       return "/blog";
     }
   })();
+
+  // Esc to exit fullscreen.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
 
   return (
     <div className="space-y-4">
@@ -1687,6 +1701,14 @@ function SiteBlogBody({ result }: { result: SiteBlogResult }) {
               <span className="text-muted-foreground">{displayPath}</span>
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => setFullscreen(true)}
+            title="Fullscreen"
+            className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--ink-2)]/60 hover:text-rose"
+          >
+            <Maximize2 className="size-3" />
+          </button>
           <a
             href={result.publish_url}
             target="_blank"
@@ -1722,6 +1744,19 @@ function SiteBlogBody({ result }: { result: SiteBlogResult }) {
         </div>
       </div>
 
+      <AnimatePresence>
+        {fullscreen && (
+          <FullscreenPreview
+            url={result.preview_url}
+            title={result.title}
+            host={displayHost}
+            path={displayPath}
+            externalUrl={result.publish_url}
+            onClose={() => setFullscreen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--ink-2)]/30 p-4">
         <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
           <Sparkles className="size-3" />
@@ -1743,6 +1778,124 @@ function SiteBlogBody({ result }: { result: SiteBlogResult }) {
         </ul>
       </div>
     </div>
+  );
+}
+
+// ---- Fullscreen iframe preview --------------------------------------------
+
+function FullscreenPreview({
+  url,
+  title,
+  host,
+  path,
+  externalUrl,
+  onClose,
+}: {
+  url: string;
+  title: string;
+  host: string;
+  path: string;
+  externalUrl: string;
+  onClose: () => void;
+}) {
+  const [iframeReady, setIframeReady] = useState(false);
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3, ease }}
+        className="fixed inset-0 z-[100] bg-[rgba(31,26,40,0.78)] backdrop-blur-2xl"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: 12 }}
+        transition={{ duration: 0.5, ease }}
+        className="fixed inset-4 z-[101] flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_40px_120px_-30px_rgba(0,0,0,0.7)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Browser chrome */}
+        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--ink-2)]/55 px-3 py-2">
+          <span className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close fullscreen"
+              className="grid size-3 place-items-center rounded-full bg-[#FF5F57] transition-transform hover:scale-110"
+            >
+              <X
+                className="size-2 text-[#7F2A22] opacity-0 group-hover:opacity-100"
+                strokeWidth={3}
+              />
+            </button>
+            <span className="size-3 rounded-full bg-[#FEBC2E]" />
+            <span className="size-3 rounded-full bg-[#28C840]" />
+          </span>
+          <div className="ml-2 flex flex-1 items-center gap-1.5 truncate rounded-[var(--radius-pill)] border border-[var(--border)] bg-white px-2.5 py-1 font-mono text-[11px] text-rose/85">
+            <Lock className="size-2.5 shrink-0 text-emerald-600" />
+            <span className="truncate">
+              <span className="text-rose">{host}</span>
+              <span className="text-muted-foreground">{path}</span>
+            </span>
+          </div>
+          <a
+            href={externalUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--ink-2)]/60 hover:text-rose"
+            title="Open in new tab"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Exit fullscreen · Esc"
+            className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--ink-2)]/60 hover:text-rose"
+          >
+            <Minimize2 className="size-3.5" />
+          </button>
+        </div>
+
+        {/* Iframe surface fills the remaining space */}
+        <div className="relative flex-1 bg-white">
+          {!iframeReady && (
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-[var(--blue)]" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.22em]">
+                  Loading live page
+                </span>
+              </div>
+            </div>
+          )}
+          <iframe
+            src={url}
+            title={title}
+            className={cn(
+              "h-full w-full border-0 transition-opacity duration-500",
+              iframeReady ? "opacity-100" : "opacity-0",
+            )}
+            loading="lazy"
+            onLoad={() => setIframeReady(true)}
+            sandbox="allow-scripts allow-same-origin allow-popups"
+          />
+        </div>
+
+        {/* Footer hint */}
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] bg-white/85 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground backdrop-blur-md">
+          <span className="inline-flex items-center gap-1.5">
+            <Globe className="size-3" />
+            Live preview · {host}
+          </span>
+          <span>press esc to exit</span>
+        </div>
+      </motion.div>
+    </>
   );
 }
 

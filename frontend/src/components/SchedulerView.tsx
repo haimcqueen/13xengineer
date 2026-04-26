@@ -406,15 +406,15 @@ export default function SchedulerView({ company, actions: _actions }: Props) {
         <div className="mt-5 flex items-center gap-5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <FileText className="size-3 text-[var(--blue)]" />
-            Article · post · newsletter
+            Tolkien · post · newsletter
           </span>
           <span className="flex items-center gap-1.5">
             <Video className="size-3 text-[#b04a3a]" />
-            Video · podcast · webinar
+            Nolan · podcast · webinar
           </span>
           <span className="flex items-center gap-1.5">
             <GitPullRequestArrow className="size-3 text-emerald-700" />
-            Website · docs · PR
+            Michelangelo · docs · PR
           </span>
         </div>
       </div>
@@ -797,9 +797,9 @@ function toneFor(agent: AgentKind): { bg: string; fg: string } {
 }
 
 function agentLabel(agent: AgentKind): string {
-  if (agent === "article") return "Article";
-  if (agent === "video") return "Video";
-  return "Website PR";
+  if (agent === "article") return "Tolkien";
+  if (agent === "video") return "Nolan";
+  return "Michelangelo";
 }
 
 function sameDay(a: Date, b: Date): boolean {

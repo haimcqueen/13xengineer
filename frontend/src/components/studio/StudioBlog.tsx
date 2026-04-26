@@ -97,7 +97,7 @@ type State =
   | { kind: "drafting"; action: ActionOut; stage: number; elapsedMs: number }
   | { kind: "ready"; action: ActionOut; markdown: string };
 
-export default function StudioBlog({ company, actions, completed }: Props) {
+export default function StudioBlog({ company, actions, onRun, completed }: Props) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [viewing, setViewing] = useState<{
     action: ActionOut;
@@ -180,7 +180,7 @@ export default function StudioBlog({ company, actions, completed }: Props) {
     >
       <div className="mx-auto w-full max-w-[820px]">
         <Header
-          eyebrow="Studio · Blog post"
+          eyebrow="Studio · Tolkien"
           title="Articles for"
           accent={own}
           subtitle="Specialist agent runs deep research on each Peec opportunity, then drafts publication-ready longform."
@@ -365,8 +365,14 @@ function EditorOverlay({
               </button>
             </div>
           </div>
-          <div className="prose prose-sm max-h-[68vh] max-w-none overflow-y-auto px-8 py-6 text-rose/90 prose-headings:text-rose prose-headings:font-medium prose-h1:text-2xl prose-h2:text-lg prose-h3:text-base prose-p:text-[13.5px] prose-p:leading-relaxed prose-li:text-[13px] prose-a:text-[var(--blue)]">
-            <Markdown>{markdown}</Markdown>
+          <div className="h-[68vh] w-full bg-white">
+            <iframe
+              src="https://brick-by-brick-clone.lovable.app/blog/what-it-takes-to-lead-ai-change-at-the-worlds-largest-law-firms"
+              title={action.title}
+              className="h-full w-full border-0"
+              loading="lazy"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            />
           </div>
         </LGCard>
       </motion.div>

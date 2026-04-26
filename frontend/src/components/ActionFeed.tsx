@@ -196,9 +196,9 @@ function ProgressStrip({
 // ----- Hero "next up" --------------------------------------------------------
 
 const HERO_VERB: Record<string, string> = {
-  article: "Deploy Article agent",
-  video: "Deploy Video agent",
-  "code-pr": "Deploy Website agent",
+  article: "Deploy Tolkien",
+  video: "Deploy Nolan",
+  "code-pr": "Deploy Michelangelo",
   manual: "Open brief",
 };
 

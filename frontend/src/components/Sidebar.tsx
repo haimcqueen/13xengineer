@@ -194,19 +194,19 @@ export default function Sidebar({
         <Section label="Studio">
           <NavItem
             icon={Code2}
-            label="Website"
+            label="Michelangelo"
             active={current === "studio-website"}
             onClick={() => onChange("studio-website")}
           />
           <NavItem
             icon={Video}
-            label="Video"
+            label="Nolan"
             active={current === "studio-video"}
             onClick={() => onChange("studio-video")}
           />
           <NavItem
             icon={FileText}
-            label="Blog post"
+            label="Tolkien"
             active={current === "studio-blog"}
             onClick={() => onChange("studio-blog")}
           />

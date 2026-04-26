@@ -167,7 +167,7 @@ export default function StudioVideo({ company, actions, completed }: Props) {
     >
       <div className="mx-auto w-full max-w-[820px]">
         <Header
-          eyebrow="Studio · Video"
+          eyebrow="Studio · Nolan"
           title="Videos for"
           accent={own}
           subtitle="Specialist agent re-cuts your strongest written thinking into short, citable video. Heavy lift — give it a minute."

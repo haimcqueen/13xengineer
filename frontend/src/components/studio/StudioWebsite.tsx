@@ -168,7 +168,7 @@ export default function StudioWebsite({
     >
       <div className="mx-auto w-full max-w-[820px]">
         <Header
-          eyebrow="Studio · Website"
+          eyebrow="Studio · Michelangelo"
           title="Optimize"
           accent={own}
           subtitle="Specialist agent reads your site, ships JSON-LD, FAQ schema, and structured data — opens a PR for review."

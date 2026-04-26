@@ -139,10 +139,10 @@ export default function AgentConfigForm({
             <div className="min-w-0">
               <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 {agent === "article"
-                  ? "Article agent"
+                  ? "Tolkien"
                   : agent === "video"
-                    ? "Video agent"
-                    : "Website agent"}
+                    ? "Nolan"
+                    : "Michelangelo"}
               </div>
               <h3
                 className="truncate text-rose"
@@ -411,7 +411,7 @@ function WebsiteConfig({
           GitHub access required
         </div>
         <p className="text-[12px] leading-relaxed text-rose/85">
-          The Website agent clones your repo, generates the structured-data
+          Michelangelo clones your repo, generates the structured-data
           edits, and opens a real PR. We need a personal access token with{" "}
           <code className="font-mono text-[11px]">repo</code> scope.
         </p>

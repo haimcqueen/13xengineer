@@ -21,19 +21,19 @@ type Identity = {
 const IDENTITY: Record<string, Identity> = {
   article: {
     icon: FileText,
-    label: "Article agent",
+    label: "Tolkien",
     bg: "rgba(199, 122, 122, 0.14)",
     fg: "#A85B5B",
   },
   video: {
     icon: Play,
-    label: "Video agent",
+    label: "Nolan",
     bg: "rgba(87, 79, 97, 0.16)",
     fg: "#574F61",
   },
   "code-pr": {
     icon: Code,
-    label: "Website agent",
+    label: "Michelangelo",
     bg: "rgba(30, 91, 201, 0.10)",
     fg: "#1E5BC9",
   },
