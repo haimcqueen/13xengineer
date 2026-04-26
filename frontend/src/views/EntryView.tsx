@@ -47,18 +47,17 @@ export default function EntryView({ value, onChange, onSubmit }: Props) {
       }}
       style={{ transformOrigin: "50% 50%" }}
     >
-      {/* Brand — top-left of viewport */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8, ease, delay: 0.15 }}
-        className="absolute left-7 top-7"
-      >
-        <MidasMark size={40} withWordmark />
-      </motion.div>
-
       {/* Centered content */}
-      <div className="w-full max-w-[640px] text-center">
+      <div className="flex w-full max-w-[640px] flex-col items-center text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease, delay: 0.05 }}
+          className="mb-10"
+        >
+          <MidasMark size={120} />
+        </motion.div>
+
         <h1
           className="mb-14 font-display text-rose"
           style={{

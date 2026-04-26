@@ -1,9 +1,7 @@
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   Calendar,
-  CheckCircle2,
-  Clock,
   FileText,
   GitPullRequestArrow,
   Plus,
@@ -26,47 +24,209 @@ import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
 type Props = {
   company: CompanyOut;
   actions: ActionOut[];
 };
 
-export default function SchedulerView({ company, actions: _actions }: Props) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const deliverables = useDeliverables();
-  const [scheduling, setScheduling] = useState<Deliverable | null>(null);
+// Calendar slots come from two sources: real Deliverables produced by the
+// agents, and a small mocked set so the calendar always looks alive.
+type CalendarSlot =
+  | {
+      kind: "deliverable";
+      deliverable: Deliverable;
+      when: Date;
+    }
+  | {
+      kind: "mock";
+      id: string;
+      title: string;
+      agent_kind: AgentKind;
+      status: "scheduled" | "published";
+      destination: string;
+      when: Date;
+    };
 
-  const weekStart = useMemo(() => {
+function slotKey(s: CalendarSlot): string {
+  return s.kind === "deliverable" ? s.deliverable.id : s.id;
+}
+
+function slotTitle(s: CalendarSlot): string {
+  return s.kind === "deliverable" ? s.deliverable.title : s.title;
+}
+
+function slotAgent(s: CalendarSlot): AgentKind {
+  return s.kind === "deliverable" ? s.deliverable.agent_kind : s.agent_kind;
+}
+
+function slotStatus(s: CalendarSlot): "scheduled" | "published" {
+  if (s.kind === "deliverable") {
+    return s.deliverable.status === "published" ? "published" : "scheduled";
+  }
+  return s.status;
+}
+
+// Mock calendar items — pure demo content, intentionally distinct from
+// anything generated through the Studio pages so the calendar shows the
+// "ongoing publishing pipeline" without leaking generated work onto it.
+function buildMockSlots(monthCursor: Date): CalendarSlot[] {
+  const now = new Date();
+  const seeds: {
+    day: number;
+    hour: number;
+    title: string;
+    agent_kind: AgentKind;
+    destination: string;
+  }[] = [
+    {
+      day: 3,
+      hour: 9,
+      title: "LinkedIn · CEO post · 'AI is making law firms more local, not less'",
+      agent_kind: "article",
+      destination: "linkedin.com",
+    },
+    {
+      day: 5,
+      hour: 14,
+      title: "X thread · 5 stats from the 2026 LegalTech adoption report",
+      agent_kind: "article",
+      destination: "x.com",
+    },
+    {
+      day: 7,
+      hour: 11,
+      title: "April newsletter · BigLaw AI adoption recap",
+      agent_kind: "article",
+      destination: "legora.com/newsletter",
+    },
+    {
+      day: 10,
+      hour: 10,
+      title: "Customer story · Mannheimer Swartling · 18-mo retrospective",
+      agent_kind: "video",
+      destination: "legora.com/customers",
+    },
+    {
+      day: 13,
+      hour: 16,
+      title: "Webinar · EU AI Act compliance for law firms",
+      agent_kind: "video",
+      destination: "zoom.us",
+    },
+    {
+      day: 16,
+      hour: 9,
+      title: "Press release · Munich office · one-year update",
+      agent_kind: "code-pr",
+      destination: "prnewswire.com",
+    },
+    {
+      day: 19,
+      hour: 13,
+      title: "Legaltech Today podcast · guest spot",
+      agent_kind: "video",
+      destination: "spotify.com",
+    },
+    {
+      day: 22,
+      hour: 10,
+      title: "ILTA EUR 2026 keynote · slides + clip",
+      agent_kind: "video",
+      destination: "iltaeur.org",
+    },
+    {
+      day: 25,
+      hour: 15,
+      title: "r/Lawyertalk · reply to 'best legal AI in 2026'",
+      agent_kind: "article",
+      destination: "reddit.com",
+    },
+    {
+      day: 28,
+      hour: 11,
+      title: "Docs update · LLM citations in API responses",
+      agent_kind: "code-pr",
+      destination: "github.com",
+    },
+  ];
+  const out: CalendarSlot[] = [];
+  for (let i = 0; i < seeds.length; i++) {
+    const s = seeds[i];
+    const when = new Date(monthCursor);
+    when.setDate(s.day);
+    when.setHours(s.hour, 0, 0, 0);
+    // Anything in the past in the visible month is "published"; future is "scheduled".
+    const status: "scheduled" | "published" =
+      when.getTime() < now.getTime() ? "published" : "scheduled";
+    out.push({
+      kind: "mock",
+      id: `mock-${monthCursor.getFullYear()}-${monthCursor.getMonth()}-${i}`,
+      title: s.title,
+      agent_kind: s.agent_kind,
+      status,
+      destination: s.destination,
+      when,
+    });
+  }
+  return out;
+}
+
+export default function SchedulerView({ company, actions: _actions }: Props) {
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  // First day of the visible month (offset from today's month).
+  const monthCursor = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
+    d.setDate(1);
+    d.setMonth(d.getMonth() + monthOffset);
+    return d;
+  }, [monthOffset]);
+
+  // 6×7 grid: starts on the Monday on/before the 1st, spans 42 days.
+  const gridStart = useMemo(() => {
+    const d = new Date(monthCursor);
     const dow = d.getDay();
     const offsetToMonday = (dow + 6) % 7;
-    d.setDate(d.getDate() - offsetToMonday + weekOffset * 7);
+    d.setDate(d.getDate() - offsetToMonday);
     return d;
-  }, [weekOffset]);
+  }, [monthCursor]);
 
   const days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(weekStart);
+    return Array.from({ length: 42 }, (_, i) => {
+      const d = new Date(gridStart);
       d.setDate(d.getDate() + i);
       return d;
     });
-  }, [weekStart]);
+  }, [gridStart]);
 
-  const drafts = deliverables.filter((d) => d.status === "draft");
-  const scheduled = deliverables.filter((d) => d.status === "scheduled");
-  const published = deliverables.filter((d) => d.status === "published");
+  // Calendar shows ONLY mocked content — anything generated via a Studio
+  // page is intentionally excluded so the schedule reads as the ongoing
+  // publishing pipeline rather than a record of agent runs.
+  const mockSlots = useMemo<CalendarSlot[]>(
+    () => buildMockSlots(monthCursor),
+    [monthCursor],
+  );
+  const slotsForCalendar = mockSlots;
 
-  const slotsForCalendar = useMemo(() => {
-    return [...scheduled, ...published]
-      .map((d) => {
-        const iso = d.scheduled_at ?? d.published_at;
-        return iso ? { d, when: new Date(iso) } : null;
-      })
-      .filter((x): x is { d: Deliverable; when: Date } => x !== null);
-  }, [scheduled, published]);
+  const mockCounts = useMemo(() => {
+    const out = { scheduled: 0, published: 0 };
+    for (const s of mockSlots) {
+      if (s.kind === "mock") {
+        if (s.status === "published") out.published += 1;
+        else out.scheduled += 1;
+      }
+    }
+    return out;
+  }, [mockSlots]);
 
   const own = company.own_brand?.name ?? company.name;
+  const monthLabel = monthCursor.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <motion.section
@@ -100,28 +260,30 @@ export default function SchedulerView({ company, actions: _actions }: Props) {
             </h1>
             <p className="mt-2 max-w-[58ch] text-[13px] text-muted-foreground">
               Everything an agent has produced lands here. Schedule drafts, watch the
-              week, and ship.
+              month, and ship.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setWeekOffset((w) => w - 1)}
+              onClick={() => setMonthOffset((m) => m - 1)}
+              aria-label="Previous month"
               className="rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
             >
               ← Prev
             </button>
             <button
               type="button"
-              onClick={() => setWeekOffset(0)}
+              onClick={() => setMonthOffset(0)}
               className="rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
             >
-              This week
+              {monthLabel}
             </button>
             <button
               type="button"
-              onClick={() => setWeekOffset((w) => w + 1)}
+              onClick={() => setMonthOffset((m) => m + 1)}
+              aria-label="Next month"
               className="rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/70 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
             >
               Next →
@@ -131,139 +293,132 @@ export default function SchedulerView({ company, actions: _actions }: Props) {
 
         {/* KPI row */}
         <div className="mb-6 grid grid-cols-3 gap-3">
-          <SummaryCard label="Drafts" value={drafts.length} sub="awaiting schedule" tone="amber" />
-          <SummaryCard label="Scheduled" value={scheduled.length} sub="this & coming weeks" tone="blue" />
-          <SummaryCard label="Published" value={published.length} sub="lifetime" tone="emerald" />
+          <SummaryCard
+            label="In flight"
+            value={mockCounts.scheduled + mockCounts.published}
+            sub="this month"
+            tone="amber"
+          />
+          <SummaryCard
+            label="Scheduled"
+            value={mockCounts.scheduled}
+            sub="upcoming this month"
+            tone="blue"
+          />
+          <SummaryCard
+            label="Published"
+            value={mockCounts.published}
+            sub="this month"
+            tone="emerald"
+          />
         </div>
 
-        <div
-          className="grid gap-5"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) 320px" }}
-        >
-          {/* Week calendar */}
+        <div>
+          {/* Month calendar */}
           <LGCard cornerRadius={20}>
+            {/* Weekday header row */}
             <div
               className="grid border-b border-[var(--border)]"
               style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}
             >
-              {days.map((d, i) => {
-                const isToday = sameDay(d, new Date());
-                return (
-                  <div
-                    key={i}
-                    className={cn(
-                      "border-l border-[var(--border)] px-4 py-3 first:border-l-0",
-                      isToday && "bg-[rgba(30,91,201,0.04)]",
-                    )}
-                  >
-                    <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                      {d.toLocaleDateString("en-US", { weekday: "short" })}
-                    </div>
-                    <div
-                      className={cn(
-                        "mt-1 font-mono text-[18px] tabular-nums",
-                        isToday ? "text-[var(--blue)]" : "text-rose",
-                      )}
-                    >
-                      {d.getDate()}
-                    </div>
-                  </div>
-                );
-              })}
+              {WEEKDAYS.map((label) => (
+                <div
+                  key={label}
+                  className="border-l border-[var(--border)] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground first:border-l-0"
+                >
+                  {label}
+                </div>
+              ))}
             </div>
 
+            {/* 6×7 day grid */}
             <div
               className="grid"
               style={{
                 gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                minHeight: 380,
+                gridAutoRows: "minmax(96px, 1fr)",
               }}
             >
               {days.map((d, dayIdx) => {
+                const inMonth = d.getMonth() === monthCursor.getMonth();
+                const isToday = sameDay(d, new Date());
                 const daySlots = slotsForCalendar
                   .filter((s) => sameDay(s.when, d))
                   .sort((a, b) => a.when.getTime() - b.when.getTime());
+                const overflow = Math.max(0, daySlots.length - 2);
+                const visible = daySlots.slice(0, 2);
+                const isWeekStart = dayIdx % 7 === 0;
+                const rowStart = Math.floor(dayIdx / 7) === 0;
+
                 return (
                   <div
                     key={dayIdx}
                     className={cn(
-                      "relative border-l border-[var(--border)] p-2 first:border-l-0",
-                      sameDay(d, new Date()) && "bg-[rgba(30,91,201,0.02)]",
+                      "relative border-l border-t border-[var(--border)] p-1.5",
+                      isWeekStart && "border-l-0",
+                      rowStart && "border-t-0",
+                      isToday && "bg-[rgba(30,91,201,0.04)]",
+                      !inMonth && "bg-[var(--ink-2)]/15",
                     )}
                   >
-                    {daySlots.length === 0 && (
+                    <div className="mb-1 flex items-center justify-between gap-1">
+                      <span
+                        className={cn(
+                          "inline-flex size-5 items-center justify-center rounded-full font-mono text-[10.5px] tabular-nums",
+                          isToday
+                            ? "bg-[var(--blue)] text-white"
+                            : inMonth
+                              ? "text-rose"
+                              : "text-muted-foreground/55",
+                        )}
+                      >
+                        {d.getDate()}
+                      </span>
+                    </div>
+                    {daySlots.length === 0 ? (
                       <div className="grid h-full place-items-center opacity-0 transition-opacity hover:opacity-60">
                         <Plus className="size-3 text-muted-foreground" />
                       </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {visible.map((s) => (
+                          <SlotChip
+                            key={slotKey(s)}
+                            slot={s}
+                            inMonth={inMonth}
+                          />
+                        ))}
+                        {overflow > 0 && (
+                          <div className="pl-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                            +{overflow} more
+                          </div>
+                        )}
+                      </div>
                     )}
-                    <div className="space-y-1.5">
-                      {daySlots.map((s) => (
-                        <SlotPill
-                          key={s.d.id}
-                          deliverable={s.d}
-                          when={s.when}
-                          onUnschedule={() => unscheduleDeliverable(s.d.id)}
-                          onPublish={() => publishDeliverable(s.d.id)}
-                        />
-                      ))}
-                    </div>
                   </div>
                 );
               })}
             </div>
           </LGCard>
-
-          {/* Drafts queue */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                Drafts queue · {drafts.length}
-              </span>
-            </div>
-            {drafts.length === 0 ? (
-              <DraftsEmpty />
-            ) : (
-              drafts.map((d) => (
-                <DraftCard
-                  key={d.id}
-                  deliverable={d}
-                  onSchedule={() => setScheduling(d)}
-                  onPublish={() => publishDeliverable(d.id)}
-                />
-              ))
-            )}
-          </div>
         </div>
 
         {/* Legend */}
         <div className="mt-5 flex items-center gap-5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <FileText className="size-3 text-[var(--blue)]" />
-            Article
+            Article · post · newsletter
           </span>
           <span className="flex items-center gap-1.5">
             <Video className="size-3 text-[#b04a3a]" />
-            Video
+            Video · podcast · webinar
           </span>
           <span className="flex items-center gap-1.5">
             <GitPullRequestArrow className="size-3 text-emerald-700" />
-            Website PR
+            Website · docs · PR
           </span>
         </div>
       </div>
 
-      <AnimatePresence>
-        {scheduling && (
-          <ScheduleModal
-            deliverable={scheduling}
-            onClose={() => setScheduling(null)}
-            onConfirm={(when) => {
-              scheduleDeliverable(scheduling.id, when);
-              setScheduling(null);
-            }}
-          />
-        )}
-      </AnimatePresence>
     </motion.section>
   );
 }
@@ -388,65 +543,72 @@ function DraftsEmpty() {
   );
 }
 
-function SlotPill({
-  deliverable,
-  when,
+function SlotChip({
+  slot,
+  inMonth,
   onUnschedule,
   onPublish,
 }: {
-  deliverable: Deliverable;
-  when: Date;
-  onUnschedule: () => void;
-  onPublish: () => void;
+  slot: CalendarSlot;
+  inMonth: boolean;
+  onUnschedule?: () => void;
+  onPublish?: () => void;
 }) {
-  const Icon = iconFor(deliverable.agent_kind);
-  const tone = toneFor(deliverable.agent_kind);
+  const agent = slotAgent(slot);
+  const Icon = iconFor(agent);
+  const tone = toneFor(agent);
+  const status = slotStatus(slot);
+  const title = slotTitle(slot);
   const [open, setOpen] = useState(false);
 
-  const isPublished = deliverable.status === "published";
+  const isPublished = status === "published";
+  const isMock = slot.kind === "mock";
 
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="group flex w-full items-center gap-1.5 overflow-hidden rounded-[10px] px-2 py-1.5 text-left transition-colors hover:bg-white/60"
+        className={cn(
+          "group flex w-full items-center gap-1 overflow-hidden rounded-[6px] px-1.5 py-1 text-left transition-colors hover:brightness-105",
+          !inMonth && "opacity-55",
+        )}
         style={{ background: tone.bg }}
       >
         <Icon
-          className="size-3 shrink-0"
+          className="size-2.5 shrink-0"
           style={{ color: tone.fg }}
-          strokeWidth={2}
+          strokeWidth={2.25}
         />
-        <span className="flex-1 truncate text-[10.5px] leading-tight text-rose">
-          {deliverable.title.replace(/^Publish a /i, "").replace(/^Ship /i, "")}
-        </span>
         <span
-          className="font-mono text-[8.5px] uppercase tracking-[0.16em] shrink-0"
-          style={{
-            color: isPublished ? "#047857" : "var(--lavender)",
-          }}
+          className="flex-1 truncate text-[10px] leading-tight"
+          style={{ color: isPublished ? "#047857" : "var(--rose)" }}
         >
-          {isPublished ? (
-            <span className="inline-flex items-center gap-0.5">
-              <CheckCircle2 className="size-2" />
-              live
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-0.5">
-              <Clock className="size-2" />
-              {pad(when.getHours())}:{pad(when.getMinutes())}
-            </span>
-          )}
+          {title.replace(/^Publish '?/i, "").replace(/'$/, "")}
         </span>
       </button>
 
       {open && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/95 p-2 shadow-lg backdrop-blur-md">
-          <div className="px-1.5 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            {agentLabel(deliverable.agent_kind)} · {when.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}
+          <div className="px-1.5 pb-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+            {agentLabel(agent)} ·{" "}
+            {slot.when.toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
           </div>
-          {!isPublished && (
+          <div className="px-1.5 pb-1 text-[11px] text-rose">
+            {title}
+          </div>
+          <div className="px-1.5 pb-2 font-mono text-[10px] text-muted-foreground">
+            {isPublished ? "Live · " : "Scheduled · "}
+            {slot.kind === "mock"
+              ? slot.destination
+              : (slot.deliverable.destination ?? "—")}
+          </div>
+          {!isPublished && onPublish && (
             <button
               type="button"
               onClick={() => {
@@ -458,7 +620,7 @@ function SlotPill({
               Publish now
             </button>
           )}
-          {!isPublished && (
+          {!isPublished && onUnschedule && (
             <button
               type="button"
               onClick={() => {
@@ -469,6 +631,11 @@ function SlotPill({
             >
               Unschedule
             </button>
+          )}
+          {isMock && (
+            <div className="rounded-md px-2 py-1.5 text-[10.5px] text-muted-foreground/80">
+              Demo entry · run an agent on the matching action to ship for real.
+            </div>
           )}
           <button
             type="button"
@@ -633,10 +800,6 @@ function agentLabel(agent: AgentKind): string {
   if (agent === "article") return "Article";
   if (agent === "video") return "Video";
   return "Website PR";
-}
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
 }
 
 function sameDay(a: Date, b: Date): boolean {
