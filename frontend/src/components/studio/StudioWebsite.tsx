@@ -1,20 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  Check,
-  ExternalLink,
-  GitBranch,
-  GitPullRequestArrow,
-  Loader2,
-  X,
-} from "lucide-react";
+import { Check, ExternalLink, GitBranch, GitPullRequestArrow, X } from "lucide-react";
 
 import ActionFeed from "@/components/ActionFeed";
 import AgentConfigForm from "@/components/AgentConfigForm";
 import LGCard from "@/components/LGCard";
+import RunOverlay, { type RunStage } from "@/components/RunOverlay";
 import { createDeliverable, useDeliverables } from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -27,16 +20,76 @@ type Props = {
 
 type State =
   | { kind: "idle" }
-  | { kind: "running"; action: ActionOut; stage: number }
+  | { kind: "running"; action: ActionOut; stage: number; elapsedMs: number }
   | { kind: "done"; action: ActionOut; prUrl: string };
 
-const STAGES = [
-  "Cloning repo",
-  "Reading site structure",
-  "Generating JSON-LD + meta",
-  "Committing changes",
-  "Opening pull request",
+const STAGES: RunStage[] = [
+  {
+    label: "Cloning repo",
+    hint: "Fetching the working tree from GitHub",
+    ms: 2400,
+  },
+  {
+    label: "Reading site structure",
+    hint: "Detecting framework, routes, existing meta",
+    ms: 3200,
+  },
+  {
+    label: "Generating JSON-LD + meta",
+    hint: "Drafting Organization · FAQPage · breadcrumbs",
+    ms: 3600,
+  },
+  {
+    label: "Committing changes",
+    hint: "Touching layout & SEO sources only",
+    ms: 2400,
+  },
+  {
+    label: "Opening pull request",
+    hint: "Filing PR with reviewers + summary",
+    ms: 2000,
+  },
 ];
+
+function streamItemsForStage(
+  stage: number,
+  repoSlug: string,
+  schemas: string[],
+): string[] {
+  if (stage === 0)
+    return [
+      `git clone https://github.com/${repoSlug}.git`,
+      "Cloned · 2,418 files",
+      "Detected default branch · main",
+      "Working tree clean",
+    ];
+  if (stage === 1)
+    return [
+      "Detected · Next.js 14 · App Router",
+      "Routes discovered · 8",
+      "Found · open-graph tags · partial",
+      "Missing · JSON-LD on / and /pricing",
+    ];
+  if (stage === 2)
+    return [
+      ...schemas.map((s) => `Drafted · ${s} schema`),
+      "Lint clean · 0 warnings",
+      "Inserted into app/layout.tsx",
+    ];
+  if (stage === 3)
+    return [
+      "Modified · app/layout.tsx",
+      "Modified · app/seo.ts",
+      "+38 / -2 lines",
+      "Commit · 'Add JSON-LD structured data'",
+    ];
+  return [
+    "Pushed · midas/seo branch",
+    "Opened PR · awaiting review",
+    "Reviewers · @design-review",
+    "Status · open",
+  ];
+}
 
 export default function StudioWebsite({
   company,
@@ -74,12 +127,14 @@ export default function StudioWebsite({
 
   function start(action: ActionOut) {
     if (state.kind === "running") return;
-    setState({ kind: "running", action, stage: 0 });
+    setState({ kind: "running", action, stage: 0, elapsedMs: 0 });
     let i = 0;
+    let elapsed = 0;
     const tick = () => {
+      elapsed += STAGES[i]?.ms ?? 0;
       i += 1;
       if (i >= STAGES.length) {
-        const prUrl = `https://github.com/${repoSlug}/pull/${42 + (Math.abs(hashCode(action.id)) % 90)}`;
+        const prUrl = `https://github.com/FabianSalge/brick-by-brick-clone/pull/4`;
         setState({ kind: "done", action, prUrl });
         const schemas = (action.target.schemas as string[] | undefined) ?? [
           "Organization",
@@ -97,10 +152,10 @@ export default function StudioWebsite({
         });
         return;
       }
-      setState({ kind: "running", action, stage: i });
-      window.setTimeout(tick, 900);
+      setState({ kind: "running", action, stage: i, elapsedMs: elapsed });
+      window.setTimeout(tick, STAGES[i]?.ms ?? 900);
     };
-    window.setTimeout(tick, 700);
+    window.setTimeout(tick, STAGES[0].ms);
   }
 
   return (
@@ -143,11 +198,21 @@ export default function StudioWebsite({
           />
         )}
         {state.kind === "running" && (
-          <RunningOverlay
+          <RunOverlay
             key="running"
-            action={state.action}
+            title={`${repoSlug} · ${state.action.title}`}
+            stages={STAGES}
             stage={state.stage}
-            repoSlug={repoSlug}
+            elapsedMs={state.elapsedMs}
+            streamItems={streamItemsForStage(
+              state.stage,
+              repoSlug,
+              (state.action.target.schemas as string[] | undefined) ?? [
+                "Organization",
+                "FAQPage",
+              ],
+            )}
+            workingLabel="Opening PR"
           />
         )}
         {state.kind === "done" && (
@@ -165,104 +230,6 @@ export default function StudioWebsite({
 }
 
 // ---- Overlays --------------------------------------------------------------
-
-function RunningOverlay({
-  action,
-  stage,
-  repoSlug,
-}: {
-  action: ActionOut;
-  stage: number;
-  repoSlug: string;
-}) {
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3, ease }}
-        className="fixed inset-0 z-40 bg-[rgba(31,26,40,0.42)] backdrop-blur-md"
-      />
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 16, scale: 0.97 }}
-        transition={{ duration: 0.45, ease }}
-        className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[520px] -translate-y-1/2"
-      >
-        <LGCard cornerRadius={22}>
-          <div className="px-7 py-7">
-            <div className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-              <GitBranch className="size-3" />
-              {repoSlug}
-            </div>
-            <h3
-              className="mb-1 text-rose"
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 17,
-                fontWeight: 500,
-                letterSpacing: "-0.012em",
-                lineHeight: 1.25,
-              }}
-            >
-              {action.title}
-            </h3>
-            <p className="mb-5 text-[12px] text-muted-foreground">
-              Website agent is opening a pull request.
-            </p>
-            <ol className="space-y-2.5">
-              {STAGES.map((label, i) => {
-                const done = i < stage;
-                const active = i === stage;
-                return (
-                  <li
-                    key={label}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/60 px-3 py-2 text-[12px]",
-                      active && "ring-1 ring-[rgba(30,91,201,0.25)]",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-5 place-items-center rounded-full",
-                        done
-                          ? "bg-emerald-500 text-white"
-                          : active
-                            ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
-                            : "bg-[var(--ink-2)]/60 text-muted-foreground",
-                      )}
-                    >
-                      {done ? (
-                        <Check className="size-3" strokeWidth={3} />
-                      ) : active ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <span className="size-1 rounded-full bg-current opacity-40" />
-                      )}
-                    </span>
-                    <span
-                      className={
-                        done
-                          ? "text-rose/85"
-                          : active
-                            ? "text-rose"
-                            : "text-muted-foreground/65"
-                      }
-                    >
-                      {label}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        </LGCard>
-      </motion.div>
-    </>
-  );
-}
 
 function DoneOverlay({
   action,

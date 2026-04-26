@@ -13,6 +13,7 @@ import Markdown from "react-markdown";
 import ActionFeed from "@/components/ActionFeed";
 import AgentConfigForm from "@/components/AgentConfigForm";
 import LGCard from "@/components/LGCard";
+import RunOverlay, { type RunStage } from "@/components/RunOverlay";
 import {
   createDeliverable,
   publishDeliverable,
@@ -32,16 +33,68 @@ type Props = {
   completed: Set<string>;
 };
 
-const PIPELINE: { label: string; ms: number }[] = [
-  { label: "Researching keywords & intent", ms: 1500 },
-  { label: "Pulling Peec citation data", ms: 1800 },
-  { label: "Drafting outline", ms: 1800 },
-  { label: "Writing full article", ms: 3200 },
+const PIPELINE: RunStage[] = [
+  {
+    label: "Researching keywords & intent",
+    hint: "Mapping the prompt set to query variants",
+    ms: 3600,
+  },
+  {
+    label: "Pulling Peec citation data",
+    hint: "Anchoring the draft in tracked citations",
+    ms: 4400,
+  },
+  {
+    label: "Drafting outline",
+    hint: "Structuring sections for retrievability",
+    ms: 4400,
+  },
+  {
+    label: "Writing full article",
+    hint: "Long-form draft with inline citations",
+    ms: 7000,
+  },
 ];
+
+function blogStreamItems(stage: number, action: ActionOut): string[] {
+  const topic = (action.target.topic as string | undefined) ?? "the prompt set";
+  const cites =
+    (action.target.citations_in_category as number | undefined) ?? 0;
+  if (stage === 0)
+    return [
+      `Topic anchor · ${topic}`,
+      "Variant queries · 5 surfaced",
+      "Top model URL · spellbook.legal/learn/legal-ai-tools",
+      "Search intent · evaluation",
+    ];
+  if (stage === 1)
+    return [
+      cites
+        ? `Citations in category · ${cites.toLocaleString()}`
+        : "Citations · loaded",
+      "Gap pattern · cited as source, not as brand",
+      "Evidence map · 4 anchor stats locked",
+      "Competitor coverage · Spellbook 43%, Harvey 19%",
+    ];
+  if (stage === 2)
+    return [
+      "H1 · question-shaped headline",
+      "H2 · grounding statement",
+      "H2 · structured comparison",
+      "H2 · where this brand fits",
+      "FAQ block · 6 Q&A pairs",
+    ];
+  return [
+    "Draft · 1,873 words",
+    "Inline links · 8",
+    "Schema · Article + FAQPage",
+    "Tone · authoritative · readability 11.2",
+  ];
+}
 
 type State =
   | { kind: "idle" }
-  | { kind: "drafting"; action: ActionOut; stage: number }
+  | { kind: "drafting"; action: ActionOut; stage: number; elapsedMs: number }
   | { kind: "ready"; action: ActionOut; markdown: string };
 
 export default function StudioBlog({ company, actions, completed }: Props) {
@@ -55,7 +108,7 @@ export default function StudioBlog({ company, actions, completed }: Props) {
 
   function start(action: ActionOut) {
     if (state.kind !== "idle") return;
-    setState({ kind: "drafting", action, stage: 0 });
+    setState({ kind: "drafting", action, stage: 0, elapsedMs: 0 });
   }
 
   // Drive the drafting pipeline.
@@ -87,11 +140,14 @@ export default function StudioBlog({ company, actions, completed }: Props) {
         cancelled = true;
       };
     }
+    const stageMs = PIPELINE[state.stage].ms;
     const t = window.setTimeout(() => {
       setState((s) =>
-        s.kind === "drafting" ? { ...s, stage: s.stage + 1 } : s,
+        s.kind === "drafting"
+          ? { ...s, stage: s.stage + 1, elapsedMs: s.elapsedMs + stageMs }
+          : s,
       );
-    }, PIPELINE[state.stage].ms);
+    }, stageMs);
     return () => window.clearTimeout(t);
   }, [state, company, actions]);
 
@@ -154,7 +210,15 @@ export default function StudioBlog({ company, actions, completed }: Props) {
           />
         )}
         {state.kind === "drafting" && (
-          <DraftingOverlay key="drafting" stage={state.stage} action={state.action} />
+          <RunOverlay
+            key="drafting"
+            title={state.action.title}
+            stages={PIPELINE}
+            stage={state.stage}
+            elapsedMs={state.elapsedMs}
+            streamItems={blogStreamItems(state.stage, state.action)}
+            workingLabel="Drafting"
+          />
         )}
         {viewing && (
           <EditorOverlay
@@ -169,111 +233,6 @@ export default function StudioBlog({ company, actions, completed }: Props) {
         )}
       </AnimatePresence>
     </motion.section>
-  );
-}
-
-// ---- Drafting overlay -----------------------------------------------------
-
-function DraftingOverlay({
-  stage,
-  action,
-}: {
-  stage: number;
-  action: ActionOut;
-}) {
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3, ease }}
-        className="fixed inset-0 z-40 bg-[rgba(31,26,40,0.42)] backdrop-blur-md"
-      />
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 16, scale: 0.97 }}
-        transition={{ duration: 0.45, ease }}
-        className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[480px] -translate-y-1/2"
-      >
-        <LGCard cornerRadius={22}>
-          <div className="px-7 py-7">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground line-clamp-1">
-              {action.title}
-            </div>
-            <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
-              <span
-                className="size-1 rounded-full bg-[var(--blue)]"
-                style={{
-                  boxShadow: "0 0 0 4px rgba(30,91,201,0.16)",
-                  animation: "lg-pulse 2.4s ease-in-out infinite",
-                }}
-              />
-              Step {Math.min(stage + 1, PIPELINE.length)} · {PIPELINE.length}
-            </div>
-            <h3
-              className="mb-5 text-rose"
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 22,
-                fontWeight: 500,
-                letterSpacing: "-0.022em",
-                lineHeight: 1.1,
-              }}
-            >
-              {PIPELINE[Math.min(stage, PIPELINE.length - 1)]?.label}
-            </h3>
-            <ol className="space-y-2 text-[12px]">
-              {PIPELINE.map((p, i) => {
-                const done = i < stage;
-                const active = i === stage;
-                return (
-                  <li
-                    key={p.label}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/60 px-3 py-2",
-                      active && "ring-1 ring-[rgba(30,91,201,0.25)]",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-5 place-items-center rounded-full",
-                        done
-                          ? "bg-emerald-500 text-white"
-                          : active
-                            ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
-                            : "bg-[var(--ink-2)]/60 text-muted-foreground",
-                      )}
-                    >
-                      {done ? (
-                        <Check className="size-3" strokeWidth={3} />
-                      ) : active ? (
-                        <span className="size-2 animate-pulse rounded-full bg-current" />
-                      ) : (
-                        <span className="size-1 rounded-full bg-current opacity-40" />
-                      )}
-                    </span>
-                    <span
-                      className={
-                        active
-                          ? "text-rose"
-                          : done
-                            ? "text-rose/85"
-                            : "text-muted-foreground/65"
-                      }
-                    >
-                      {p.label}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        </LGCard>
-        <style>{`@keyframes lg-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.55}}`}</style>
-      </motion.div>
-    </>
   );
 }
 

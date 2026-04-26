@@ -431,7 +431,7 @@ function buildResult(action: ActionOut, company: CompanyOut): AgentResult {
         title: action.title,
         repo: `${company.name.toLowerCase().replace(/\s+/g, "-")}/website`,
         branch: "midas/structured-data",
-        pr_url: `https://github.com/demo/${company.id}/pull/42`,
+        pr_url: `https://github.com/FabianSalge/brick-by-brick-clone/pull/4`,
         files_changed: ["index.html", "src/components/SEO.tsx"],
         diff_preview: diff,
         schemas_added: schemas,

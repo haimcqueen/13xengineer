@@ -2279,7 +2279,7 @@ function buildResult(
     title: action.title,
     repo: `${own.toLowerCase().replace(/\s+/g, "-")}/website`,
     branch: config.defaultBranch,
-    pr_url: `https://github.com/demo/${slug}/pull/${42 + (Math.abs(hashCode(action.id)) % 90)}`,
+    pr_url: `https://github.com/FabianSalge/brick-by-brick-clone/pull/4`,
     files_changed: ["app/layout.tsx", "app/seo.ts"],
     diff_preview: diff,
     schemas_added: config.schemas,

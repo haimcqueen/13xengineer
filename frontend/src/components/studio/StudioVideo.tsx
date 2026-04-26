@@ -12,6 +12,7 @@ import {
 import ActionFeed from "@/components/ActionFeed";
 import AgentConfigForm from "@/components/AgentConfigForm";
 import LGCard from "@/components/LGCard";
+import RunOverlay, { type RunStage } from "@/components/RunOverlay";
 import {
   createDeliverable,
   publishDeliverable,
@@ -30,14 +31,61 @@ type Props = {
   completed: Set<string>;
 };
 
-const RENDER_STAGES: { label: string; hint: string; ms: number }[] = [
-  { label: "Drafting storyboard", hint: "Mapping the demo to your product surface", ms: 4500 },
-  { label: "Selecting shots", hint: "Pulling product UI takes from the canvas", ms: 5500 },
-  { label: "Generating voice-over", hint: "Writing & timing the script to picture", ms: 5000 },
-  { label: "Animating scenes", hint: "Camera, transitions, motion design", ms: 6500 },
-  { label: "Mastering audio", hint: "Mixing music bed & VO levels", ms: 4500 },
-  { label: "Encoding 1080p", hint: "Final pass · constant bitrate", ms: 5000 },
+const RENDER_STAGES: RunStage[] = [
+  { label: "Drafting storyboard", hint: "Mapping the demo to your product surface", ms: 6500 },
+  { label: "Selecting shots", hint: "Pulling product UI takes from the canvas", ms: 8000 },
+  { label: "Generating voice-over", hint: "Writing & timing the script to picture", ms: 7200 },
+  { label: "Animating scenes", hint: "Camera, transitions, motion design", ms: 9500 },
+  { label: "Mastering audio", hint: "Mixing music bed & VO levels", ms: 6500 },
+  { label: "Encoding 1080p", hint: "Final pass · constant bitrate", ms: 7200 },
 ];
+
+function videoStreamItems(stage: number): string[] {
+  if (stage === 0)
+    return [
+      "Beat 1 · Open on a clock",
+      "Beat 2 · Pull-quote · Kyle Poe · Mar 25, 2026",
+      "Beat 3 · Stat reveal · 72% / 90%",
+      "Beat 4 · Big Four accounting analogy",
+      "Beat 5 · Close on the new pricing ecosystem",
+    ];
+  if (stage === 1)
+    return [
+      "Selected take · macro on clock face",
+      "Selected take · Kyle Poe quote card",
+      "Selected take · 72% bar chart",
+      "Selected take · 90% bar chart",
+      "Selected take · Big Four analogy diagram",
+    ];
+  if (stage === 2)
+    return [
+      "VO script · 138 words",
+      "Pacing · 92 wpm · warm tone",
+      "Punch-ins on stat reveals",
+      "Outro line locked",
+    ];
+  if (stage === 3)
+    return [
+      "Scene 1 · 3.2s · ease-out",
+      "Scene 2 · 4.0s · cross-fade",
+      "Scene 3 · 4.8s · cut",
+      "Scene 4 · 4.4s · push-in",
+      "Scene 5 · 3.6s · ease-in",
+    ];
+  if (stage === 4)
+    return [
+      "Music bed · ducked under VO",
+      "VO bus · -3 LUFS",
+      "Master · -16 LUFS · stereo",
+      "Limiter · ceiling -1 dBTP",
+    ];
+  return [
+    "Pass 1 · spatial encoding",
+    "Pass 2 · constant bitrate · 8 Mbps",
+    "MP4 muxed · 1080p · 24fps",
+    "Asset registered in your library",
+  ];
+}
 
 const VIDEO_SRC = "/videos/jude_law.mp4";
 
@@ -104,12 +152,10 @@ export default function StudioVideo({ company, actions, completed }: Props) {
     return () => window.clearTimeout(t);
   }, [state, company]);
 
-  const totalMs = RENDER_STAGES.reduce((acc, s) => acc + s.ms, 0);
   const elapsed =
     state.kind === "rendering"
       ? RENDER_STAGES.slice(0, state.stage).reduce((acc, s) => acc + s.ms, 0)
       : 0;
-  const progress = Math.min(1, elapsed / totalMs);
 
   return (
     <motion.section
@@ -151,11 +197,14 @@ export default function StudioVideo({ company, actions, completed }: Props) {
           />
         )}
         {state.kind === "rendering" && (
-          <RenderOverlay
+          <RunOverlay
             key="rendering"
-            action={state.action}
+            title={state.action.title}
+            stages={RENDER_STAGES}
             stage={state.stage}
-            progress={progress}
+            elapsedMs={elapsed}
+            streamItems={videoStreamItems(state.stage)}
+            workingLabel="Rendering"
           />
         )}
         {previewing && (
@@ -170,95 +219,6 @@ export default function StudioVideo({ company, actions, completed }: Props) {
         )}
       </AnimatePresence>
     </motion.section>
-  );
-}
-
-// ---- Render overlay -------------------------------------------------------
-
-function RenderOverlay({
-  action,
-  stage,
-  progress,
-}: {
-  action: ActionOut;
-  stage: number;
-  progress: number;
-}) {
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3, ease }}
-        className="fixed inset-0 z-40 bg-[rgba(31,26,40,0.42)] backdrop-blur-md"
-      />
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 16, scale: 0.97 }}
-        transition={{ duration: 0.45, ease }}
-        className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[480px] -translate-y-1/2"
-      >
-        <LGCard cornerRadius={22}>
-          <div className="px-7 py-7">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground line-clamp-1">
-              {action.title}
-            </div>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={stage}
-                initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{
-                  opacity: 0,
-                  y: -6,
-                  filter: "blur(4px)",
-                  transition: { duration: 0.4, ease },
-                }}
-                transition={{ duration: 0.6, ease }}
-              >
-                <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
-                  <span
-                    className="size-1 rounded-full bg-[var(--blue)]"
-                    style={{
-                      boxShadow: "0 0 0 4px rgba(30,91,201,0.16)",
-                      animation: "lg-pulse 2.4s ease-in-out infinite",
-                    }}
-                  />
-                  Step {stage + 1} · {RENDER_STAGES.length}
-                </div>
-                <h3
-                  className="text-rose"
-                  style={{
-                    fontFamily: "var(--font-sans)",
-                    fontSize: 22,
-                    fontWeight: 500,
-                    letterSpacing: "-0.022em",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {RENDER_STAGES[stage]?.label}
-                </h3>
-                {RENDER_STAGES[stage]?.hint && (
-                  <p className="mt-2 text-[12px] tracking-[-0.005em] text-muted-foreground">
-                    {RENDER_STAGES[stage]?.hint}
-                  </p>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-          <div className="relative h-px w-full overflow-hidden bg-[var(--border)]/70">
-            <motion.div
-              className="absolute inset-y-0 left-0 bg-[var(--blue)]"
-              animate={{ width: `${progress * 100}%` }}
-              transition={{ duration: 0.6, ease }}
-            />
-          </div>
-          <style>{`@keyframes lg-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.55}}`}</style>
-        </LGCard>
-      </motion.div>
-    </>
   );
 }
 

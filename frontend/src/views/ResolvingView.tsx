@@ -1,20 +1,20 @@
 /**
- * ResolvingView — minimalist liquid-glass resolve screen.
+ * ResolvingView — home-screen loading state.
  *
- * One glass card. One headline. One subtle progress thread. Slow rhythm.
+ * Same visual language as the studio loading overlays (RunOverlay): a single
+ * liquid-glass card with stage focus, live streaming output, hairline
+ * progress and percent/remaining footer. Rendered inline (no backdrop) since
+ * the entire screen IS the loading state on /home.
  *
- * Real backend events drive the labels (Exa crawl → Peec match → ready);
- * min/max dwell times keep the rhythm contemplative regardless of how fast
- * the API actually completes.
+ * Real backend events drive how far we've advanced; the per-stage minMs floor
+ * keeps the rhythm legible even when the API completes in <1s.
  */
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { Check, Loader2 } from "lucide-react";
+import { motion } from "motion/react";
 
-import LGCard from "@/components/LGCard";
+import RunOverlay, { type RunStage } from "@/components/RunOverlay";
 import { startResolve } from "@/lib/api";
 import type { ProgressEvent, ResolveError } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -24,55 +24,60 @@ type Props = {
   onError: (err: ResolveError) => void;
 };
 
-type StepKey =
-  | "reading"
-  | "mapping"
-  | "matching"
-  | "loading"
-  | "ready";
+type StepKey = "reading" | "mapping" | "matching" | "loading" | "ready";
 
-type Step = {
-  key: StepKey;
-  label: string;
-  hint: string;
-  /** Minimum time this step is shown, even if the backend already advanced. */
-  minMs: number;
-};
+type Step = RunStage & { key: StepKey };
+
+const PEEC_BADGE = (
+  <>
+    <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground/85">
+      via
+    </span>
+    <img
+      src="/peec-logo.svg"
+      alt="Peec"
+      className="h-3 w-auto opacity-85"
+      style={{ filter: "saturate(0)" }}
+    />
+  </>
+);
 
 const STEPS: Step[] = [
   {
     key: "reading",
     label: "Reading the site",
     hint: "Fetching pages",
-    minMs: 1100,
+    ms: 3200,
   },
   {
     key: "mapping",
     label: "Mapping the brand",
     hint: "Industry · markets · competitors",
-    minMs: 1100,
+    ms: 3200,
   },
   {
     key: "matching",
     label: "Resolving on Peec",
     hint: "Project · prompt bank · brands",
-    minMs: 900,
+    ms: 2800,
+    badge: PEEC_BADGE,
   },
   {
     key: "loading",
     label: "Loading visibility data",
     hint: "30-day reports across engines",
-    minMs: 1100,
+    ms: 3200,
+    badge: PEEC_BADGE,
   },
   {
     key: "ready",
     label: "Ready",
     hint: "",
-    minMs: 300,
+    ms: 700,
   },
 ];
 
-const SETTLE_MS = 300;
+const SETTLE_MS = 500;
 
 // Map backend events → which step we're on. Events arrive over the lifetime
 // of the resolve; the step machine only ever advances, so out-of-order
@@ -91,11 +96,48 @@ const EVENT_TO_INDEX: Record<string, number> = {
   done: 4,
 };
 
+function streamItemsForStep(idx: number, livePaths: string[]): string[] {
+  if (idx === 0) {
+    if (livePaths.length > 0) {
+      return livePaths.slice(0, 5).map((p) => `GET ${p}`);
+    }
+    return [
+      "GET /",
+      "GET /about",
+      "GET /product",
+      "GET /customers",
+      "GET /security",
+    ];
+  }
+  if (idx === 1)
+    return [
+      "Industry · LegalTech · AI workspace",
+      "Active markets · 15 verified",
+      "Languages · 9",
+      "Competitors · Harvey · Spellbook · Luminance",
+    ];
+  if (idx === 2)
+    return [
+      "Resolving project · or_f9...",
+      "Prompt bank · 421 active",
+      "Brands tracked · 9",
+      "Topics · 5",
+    ];
+  if (idx === 3)
+    return [
+      "Brand report · 30 day window",
+      "Domain report · loaded",
+      "Market report · per-country",
+      "Reports merged into snapshot",
+    ];
+  return ["Snapshot ready"];
+}
+
 export default function ResolvingView({ input, onResolved, onError }: Props) {
   const [stepIdx, setStepIdx] = useState(0);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [livePaths, setLivePaths] = useState<string[]>([]);
   const stepEnteredAt = useRef<number>(Date.now());
-  // Latest "intent" from the backend — index we want to be at, gated by minMs.
   const targetIdxRef = useRef(0);
 
   const domain = formatDomain(input);
@@ -108,6 +150,15 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
         if (typeof target === "number") {
           targetIdxRef.current = Math.max(targetIdxRef.current, target);
         }
+        if (evt.type === "site_path_seen") {
+          const data = (evt.data ?? {}) as Record<string, unknown>;
+          const path = data.path;
+          if (typeof path === "string") {
+            setLivePaths((prev) =>
+              prev.includes(path) ? prev : [...prev, path],
+            );
+          }
+        }
       },
       onDone: (id) => setCompanyId(id),
       onError,
@@ -116,16 +167,12 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
   }, [input, onError]);
 
   // ---- Step machine: deterministic setTimeout chain.
-  // Each step holds at least minMs. If the backend has already signalled we
-  // should be further along (target > current), we advance the moment the
-  // floor elapses; otherwise we still advance after minMs so the user is
-  // never stuck on one step forever.
   useEffect(() => {
     if (stepIdx >= STEPS.length - 1) return;
     const t = window.setTimeout(() => {
       stepEnteredAt.current = Date.now();
       setStepIdx((i) => Math.min(i + 1, STEPS.length - 1));
-    }, STEPS[stepIdx].minMs);
+    }, STEPS[stepIdx].ms);
     return () => window.clearTimeout(t);
   }, [stepIdx]);
 
@@ -137,14 +184,10 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
     return () => window.clearTimeout(t);
   }, [stepIdx, companyId, onResolved]);
 
-  const totalMs = STEPS.reduce((acc, s) => acc + s.minMs, 0);
+  // Aggregate elapsed across completed steps + active step's elapsed.
   const elapsedMs =
-    STEPS.slice(0, stepIdx).reduce((acc, s) => acc + s.minMs, 0) +
-    Math.min(STEPS[stepIdx].minMs, Date.now() - stepEnteredAt.current);
-  const progress = Math.min(1, elapsedMs / totalMs);
-
-  const isPeecStep =
-    STEPS[stepIdx].key === "matching" || STEPS[stepIdx].key === "loading";
+    STEPS.slice(0, stepIdx).reduce((acc, s) => acc + s.ms, 0) +
+    Math.min(STEPS[stepIdx].ms, Date.now() - stepEnteredAt.current);
 
   return (
     <motion.section
@@ -176,7 +219,7 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
       />
 
       <div
-        className="text-rose mb-1 text-center"
+        className="text-rose mb-4 text-center"
         style={{
           fontFamily: "var(--font-sans)",
           fontSize: "clamp(1.05rem, 2vw, 1.25rem)",
@@ -190,160 +233,15 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
         </span>
       </div>
 
-      {/* Single liquid-glass card · matches the studio drafting overlays */}
-      <div className="mt-8 w-full max-w-[480px]">
-        <LGCard cornerRadius={22}>
-          <div className="px-7 py-7">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={STEPS[stepIdx].key}
-                initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{
-                  opacity: 0,
-                  y: -6,
-                  filter: "blur(4px)",
-                  transition: { duration: 0.45, ease },
-                }}
-                transition={{ duration: 0.7, ease }}
-              >
-                <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
-                  <span
-                    className="size-1 rounded-full bg-[var(--blue)]"
-                    style={{
-                      boxShadow: "0 0 0 4px rgba(30,91,201,0.16)",
-                      animation:
-                        stepIdx < STEPS.length - 1
-                          ? "lg-pulse 2.4s ease-in-out infinite"
-                          : "none",
-                    }}
-                  />
-                  Step {stepIdx + 1} · {STEPS.length}
-                  {isPeecStep && <PeecAttribution />}
-                </div>
-                <h2
-                  className="text-rose"
-                  style={{
-                    fontFamily: "var(--font-sans)",
-                    fontSize: "clamp(1.55rem, 2.8vw, 1.85rem)",
-                    fontWeight: 500,
-                    letterSpacing: "-0.028em",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {STEPS[stepIdx].label}
-                </h2>
-                {STEPS[stepIdx].hint && (
-                  <p className="mt-2 text-[12.5px] tracking-[-0.005em] text-muted-foreground">
-                    {STEPS[stepIdx].hint}
-                  </p>
-                )}
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Full stage list — same pattern as the studio drafting overlay */}
-            <ol className="mt-6 space-y-2 text-[12px]">
-              {STEPS.slice(0, -1).map((s, i) => {
-                const done = i < stepIdx;
-                const active = i === stepIdx;
-                const usesPeec = s.key === "matching" || s.key === "loading";
-                return (
-                  <li
-                    key={s.key}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/55 px-3 py-2",
-                      active && "ring-1 ring-[rgba(30,91,201,0.25)]",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-5 place-items-center rounded-full",
-                        done
-                          ? "bg-emerald-500 text-white"
-                          : active
-                            ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
-                            : "bg-[var(--ink-2)]/60 text-muted-foreground",
-                      )}
-                    >
-                      {done ? (
-                        <Check className="size-3" strokeWidth={3} />
-                      ) : active ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <span className="size-1 rounded-full bg-current opacity-40" />
-                      )}
-                    </span>
-                    <span
-                      className={cn(
-                        "flex-1 truncate",
-                        active
-                          ? "text-rose"
-                          : done
-                            ? "text-rose/85"
-                            : "text-muted-foreground/70",
-                      )}
-                    >
-                      {s.label}
-                    </span>
-                    {usesPeec && (
-                      <img
-                        src="/peec-logo.svg"
-                        alt="Peec"
-                        aria-label="powered by Peec"
-                        className={cn(
-                          "h-2.5 w-auto shrink-0",
-                          active
-                            ? "opacity-90"
-                            : done
-                              ? "opacity-60"
-                              : "opacity-35",
-                        )}
-                        style={{ filter: "saturate(0)" }}
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-
-          {/* Hairline progress thread */}
-          <div className="relative h-px w-full overflow-hidden bg-[var(--border)]/70">
-            <motion.div
-              className="absolute inset-y-0 left-0 bg-[var(--blue)]"
-              animate={{ width: `${progress * 100}%` }}
-              transition={{ duration: 0.6, ease }}
-            />
-          </div>
-        </LGCard>
-      </div>
-
-      {/* Tiny inline keyframes for the dot pulse */}
-      <style>{`
-        @keyframes lg-pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.4); opacity: 0.55; }
-        }
-      `}</style>
-    </motion.section>
-  );
-}
-
-// ---- Peec attribution chip — appears beside the step counter when the
-// active step talks to Peec (matching / loading visibility data).
-function PeecAttribution() {
-  return (
-    <span className="ml-auto inline-flex items-center gap-1.5 normal-case tracking-normal">
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground/85">
-        via
-      </span>
-      <img
-        src="/peec-logo.svg"
-        alt="Peec"
-        className="h-3 w-auto opacity-85"
-        style={{ filter: "saturate(0)" }}
+      <RunOverlay
+        mode="inline"
+        stages={STEPS}
+        stage={stepIdx}
+        elapsedMs={elapsedMs}
+        streamItems={streamItemsForStep(stepIdx, livePaths)}
+        workingLabel="Resolving"
       />
-    </span>
+    </motion.section>
   );
 }
 

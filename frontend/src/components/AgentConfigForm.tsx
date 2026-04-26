@@ -51,7 +51,7 @@ export function defaultAgentConfig(action: ActionOut): AgentConfig {
     voiceover: "warm",
     aspect: "16:9",
     schemas: targetSchemas,
-    repoUrl: "",
+    repoUrl: "https://github.com/FabianSalge/brick-by-brick-clone",
     githubToken: "",
     siteUrl,
     defaultBranch: "main",
