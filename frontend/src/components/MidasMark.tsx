@@ -4,12 +4,16 @@ type Props = {
   withWordmark?: boolean;
 };
 
-export default function FelixMark({ size = 40, className, withWordmark = false }: Props) {
+export default function MidasMark({
+  size = 40,
+  className,
+  withWordmark = false,
+}: Props) {
   return (
     <span className={`inline-flex items-center gap-3 ${className ?? ""}`}>
       <img
-        src="/felix_logo_2.png"
-        alt="Felix"
+        src="/midas_logo.jpeg"
+        alt="MIDAS"
         decoding="async"
         draggable={false}
         className="block select-none"
@@ -27,7 +31,7 @@ export default function FelixMark({ size = 40, className, withWordmark = false }
             fontVariationSettings: '"opsz" 144, "SOFT" 100, "WONK" 1',
           }}
         >
-          Felix
+          MIDAS
         </span>
       )}
     </span>

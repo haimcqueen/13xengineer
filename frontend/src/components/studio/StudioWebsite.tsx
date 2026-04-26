@@ -38,7 +38,12 @@ const STAGES = [
   "Opening pull request",
 ];
 
-export default function StudioWebsite({ company, actions, completed }: Props) {
+export default function StudioWebsite({
+  company,
+  actions,
+  onRun,
+  completed,
+}: Props) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [configFor, setConfigFor] = useState<ActionOut | null>(null);
   const deliverables = useDeliverables();
@@ -47,6 +52,12 @@ export default function StudioWebsite({ company, actions, completed }: Props) {
   const repoSlug = `${(company.own_domain ?? "site").replace(/\.[^.]+$/, "")}/${(company.own_brand?.name ?? "site").toLowerCase().replace(/\s+/g, "-")}`;
 
   function handleRun(action: ActionOut) {
+    // site_blog (publish-to-site) doesn't fit the GitHub-PR overlays here —
+    // delegate to the global AgentRunPanel which has the publish flow + iframe.
+    if (action.kind === "site_blog") {
+      onRun(action);
+      return;
+    }
     // Already shipped → reopen the done overlay with the saved PR url.
     const existing = deliverables.find((d) => d.action_id === action.id);
     if (existing && existing.payload.type === "code-pr") {
@@ -78,7 +89,7 @@ export default function StudioWebsite({ company, actions, completed }: Props) {
           type: "code-pr",
           title: action.title,
           repo: repoSlug,
-          branch: `felix/${action.id.split("_").slice(-1)[0]?.slice(0, 6) ?? "abc"}`,
+          branch: `midas/${action.id.split("_").slice(-1)[0]?.slice(0, 6) ?? "abc"}`,
           pr_url: prUrl,
           files_changed: ["app/layout.tsx", "app/seo.ts"],
           diff_preview: "+ structured data added",

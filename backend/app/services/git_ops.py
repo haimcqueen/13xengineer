@@ -95,7 +95,7 @@ async def clone(repo_url: str, token: str | None, *, depth: int = 1) -> Path:
 
     Caller owns cleanup — use `cleanup(path)` or wrap in TemporaryDirectory.
     """
-    tmp_root = Path(tempfile.mkdtemp(prefix="felix-repo-"))
+    tmp_root = Path(tempfile.mkdtemp(prefix="midas-repo-"))
     target = tmp_root / "repo"
     auth_url = _authed_url(repo_url, token)
     try:
@@ -203,8 +203,8 @@ async def commit_and_push(
     branch: str,
     message: str,
     *,
-    author_name: str = "Felix Bot",
-    author_email: str = "felix-bot@peec.ai",
+    author_name: str = "MIDAS Bot",
+    author_email: str = "midas-bot@peec.ai",
 ) -> None:
     """Create branch, stage all changes, commit, push to origin."""
     # Local-scope identity so we don't depend on the host's git config.

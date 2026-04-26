@@ -22,7 +22,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Felix API", lifespan=lifespan)
+app = FastAPI(title="MIDAS API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

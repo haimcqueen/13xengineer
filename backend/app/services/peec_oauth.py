@@ -41,7 +41,7 @@ def fetch_metadata(timeout: float = 10.0) -> OAuthMetadata:
 
 def register_client(
     metadata: OAuthMetadata,
-    client_name: str = "Felix",
+    client_name: str = "MIDAS",
     redirect_uri: str | None = None,
 ) -> str:
     """OAuth 2.0 Dynamic Client Registration. Returns the new client_id."""

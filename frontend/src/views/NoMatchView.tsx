@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
-import FelixMark from "@/components/FelixMark";
+import MidasMark from "@/components/MidasMark";
 import GlassPanel from "@/components/GlassPanel";
 import type { ResolveError } from "@/lib/types";
 
@@ -48,7 +48,7 @@ export default function NoMatchView({
               transition={{ duration: 0.6, ease, delay: 0.1 }}
               className="mb-5"
             >
-              <FelixMark size={56} />
+              <MidasMark size={56} />
             </motion.div>
             <div className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
               No match yet

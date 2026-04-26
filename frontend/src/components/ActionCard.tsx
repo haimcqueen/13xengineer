@@ -4,7 +4,7 @@ import AgentBadge from "@/components/AgentBadge";
 import GlassPanel from "@/components/GlassPanel";
 import { useDeliverableForAction } from "@/lib/deliverables";
 import type { Deliverable } from "@/lib/deliverables";
-import { agentAccent, agentVerbs } from "@/lib/agentIdentity";
+import { actionVerbs, agentAccent } from "@/lib/agentIdentity";
 import type { ActionOut, Opportunity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -106,7 +106,7 @@ function scheduleLabel(iso: string | null): string {
 export default function ActionCard({ action, onRun, completed }: Props) {
   const chips = targetChips(action.target);
   const agent = action.suggested_agent;
-  const verbs = agentVerbs(agent);
+  const verbs = actionVerbs(action);
   const accent = agentAccent(agent);
 
   const deliverable = useDeliverableForAction(action.id);

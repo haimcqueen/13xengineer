@@ -35,7 +35,7 @@ _VALID_PLAN = {
 
 @pytest.fixture
 def repo_with_index(tmp_path):
-    repo = tmp_path / "felix-repo-x" / "repo"
+    repo = tmp_path / "midas-repo-x" / "repo"
     repo.mkdir(parents=True)
     (repo / "index.html").write_text("<html></html>", encoding="utf-8")
     return repo
@@ -211,8 +211,8 @@ async def test_happy_path_opens_pr(
     rewritten = (repo_with_index / "index.html").read_text(encoding="utf-8")
     assert "application/ld+json" in rewritten
 
-    # Branch name shape: "felix/" + first 8 chars after the j_ prefix
-    expected_branch_prefix = "felix/"
+    # Branch name shape: "midas/" + first 8 chars after the j_ prefix
+    expected_branch_prefix = "midas/"
     commit_call = commit_mock.call_args
     assert commit_call.args[1].startswith(expected_branch_prefix)
 
@@ -255,7 +255,7 @@ async def test_raises_when_no_edits_applied(
         agent_kind="code-pr",
     )
 
-    repo = tmp_path / "felix-repo-y" / "repo"
+    repo = tmp_path / "midas-repo-y" / "repo"
     repo.mkdir(parents=True)
     (repo / "index.html").write_text("<html></html>")
 

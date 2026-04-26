@@ -4,7 +4,7 @@ import { Sparkles, X } from "lucide-react";
 
 import ActionCard from "@/components/ActionCard";
 import AgentRunPanel from "@/components/AgentRunPanel";
-import FelixMark from "@/components/FelixMark";
+import MidasMark from "@/components/MidasMark";
 import type { ActionOut, CompanyOut, Opportunity } from "@/lib/types";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -64,9 +64,9 @@ export default function InsightsView({ company, actions, onReset }: Props) {
       exit={{ opacity: 0, transition: { duration: 0.35 } }}
       style={{ transformOrigin: "50% 50%" }}
     >
-      {/* Top brand strip — Felix on the left, reset on the right */}
+      {/* Top brand strip — MIDAS on the left, reset on the right */}
       <div className="mb-10 flex items-center justify-between gap-4">
-        <FelixMark size={28} withWordmark />
+        <MidasMark size={28} withWordmark />
         <button
           type="button"
           onClick={onReset}
@@ -88,7 +88,7 @@ export default function InsightsView({ company, actions, onReset }: Props) {
         <div className="mb-2 flex items-center gap-3 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
           <span className="h-px w-8 bg-[var(--lavender)]/40" />
           <Sparkles className="size-3 text-[var(--blue-soft)]" />
-          Felix · Action plan
+          MIDAS · Action plan
         </div>
         <h1
           className="font-display text-rose"

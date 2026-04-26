@@ -14,6 +14,24 @@
   "actions": [
     {
       "category": "owned_media",
+      "kind": "site_blog",
+      "title": "Publish 'What it takes to lead AI change at the world's largest law firms' to legora.com/blog",
+      "rationale": "OWNED·THOUGHT-LEADERSHIP has 0% Legora coverage on the 1,184 'AI adoption at BigLaw' citations across the prompt set. The keyword cluster around 'AI change management', 'legal innovation leadership', and 'AI-ready law firms' is dominated by McKinsey + Thomson Reuters editorial — but only as third-party links. An owned essay published to legora.com/blog plants Legora's flag inside the BigLaw decision-maker conversation and converts a high-intent retrieval pattern that Harvey is currently winning by default.",
+      "opportunity": "high",
+      "target": {
+        "format": "thought-leadership essay",
+        "topic": "AI change at BigLaw",
+        "audience": "GC, Innovation Lead, COO at AmLaw 100 firms",
+        "slug": "what-it-takes-to-lead-ai-change-at-the-worlds-largest-law-firms",
+        "publish_url": "https://legora.com/blog/what-it-takes-to-lead-ai-change-at-the-worlds-largest-law-firms",
+        "preview_url": "https://brick-by-brick-clone.lovable.app/blog/what-it-takes-to-lead-ai-change-at-the-worlds-largest-law-firms",
+        "citations_in_category": 1184,
+        "word_count": 1850
+      },
+      "suggested_agent": "code-pr"
+    },
+    {
+      "category": "owned_media",
       "kind": "article",
       "title": "Publish 'AI Document Review for M&A Due Diligence: What Actually Works'",
       "rationale": "Buyers searching 'AI document review M&A due diligence' are mid-deal evaluators with high commercial intent — and Legora is invisible on this query. The article opens on a $1.5M tax liability hidden by a fabricated AI citation (Bloomberg, Apr 2026), grounds the case for AI in McKinsey's 20% cost / 30-50% faster cycle data, and ends with the practitioner's checklist firms ask for. OWNED·ARTICLE shows 67% gap across 2,841 due-diligence citations.",

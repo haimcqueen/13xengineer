@@ -115,4 +115,23 @@ export type CodePrResult = {
   schemas_added: string[];
 };
 
-export type AgentResult = ArticleResult | VideoResult | CodePrResult;
+/**
+ * Result of the Article agent when the action's `kind === "site_blog"`:
+ * the article was drafted AND "published" to the brand's own site.
+ * `preview_url` is what we actually iframe; `publish_url` is the
+ * brand-owned URL we display to make the publish feel real.
+ */
+export type SiteBlogResult = {
+  type: "site-blog";
+  title: string;
+  publish_url: string;
+  preview_url: string;
+  word_count: number;
+  topic: string;
+};
+
+export type AgentResult =
+  | ArticleResult
+  | VideoResult
+  | CodePrResult
+  | SiteBlogResult;

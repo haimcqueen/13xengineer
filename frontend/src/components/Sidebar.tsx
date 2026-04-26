@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import FelixMark from "@/components/FelixMark";
+import MidasMark from "@/components/MidasMark";
 import { useDeliverables } from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -129,7 +129,7 @@ export default function Sidebar({
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="flex items-center justify-between gap-3 px-5 pb-3 pt-5"
       >
-        <FelixMark size={26} withWordmark />
+        <MidasMark size={26} withWordmark />
         <button
           type="button"
           onClick={onReset}

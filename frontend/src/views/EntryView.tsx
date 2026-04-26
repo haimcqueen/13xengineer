@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight } from "lucide-react";
 
-import FelixMark from "@/components/FelixMark";
+import MidasMark from "@/components/MidasMark";
 
 const PLACEHOLDERS = [
   "acme.com",
@@ -54,7 +54,7 @@ export default function EntryView({ value, onChange, onSubmit }: Props) {
         transition={{ duration: 0.8, ease, delay: 0.15 }}
         className="absolute left-7 top-7"
       >
-        <FelixMark size={40} withWordmark />
+        <MidasMark size={40} withWordmark />
       </motion.div>
 
       {/* Centered content */}

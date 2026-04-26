@@ -1,4 +1,4 @@
-"""One-time bootstrap: OAuth-connect this Felix instance to a Peec account.
+"""One-time bootstrap: OAuth-connect this MIDAS instance to a Peec account.
 
 Usage:
     uv run python -m app.scripts.connect_peec
@@ -52,7 +52,7 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         body = (
             "<html><body style='font-family:system-ui;padding:2rem;'>"
-            "<h2>Felix is connected to Peec.</h2>"
+            "<h2>MIDAS is connected to Peec.</h2>"
             "<p>You can close this tab and return to your terminal.</p>"
             "</body></html>"
         )
@@ -69,8 +69,8 @@ def main() -> int:
     print(f"  authorization_endpoint = {metadata.authorization_endpoint}")
     print(f"  token_endpoint         = {metadata.token_endpoint}")
 
-    print("→ Registering Felix as an OAuth client (DCR)…")
-    client_id = peec_oauth.register_client(metadata, client_name="Felix (local)")
+    print("→ Registering MIDAS as an OAuth client (DCR)…")
+    client_id = peec_oauth.register_client(metadata, client_name="MIDAS (local)")
     print(f"  client_id = {client_id}")
 
     code_verifier, code_challenge = peec_oauth.make_pkce()

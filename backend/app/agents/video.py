@@ -13,8 +13,8 @@ class VideoAgent:
             "type": "video",
             "title": action.title,
             "duration_seconds": int(target.get("duration_target_seconds", 90)),
-            "video_url": f"https://demo.felix.local/videos/{company.id}/preview.mp4",
-            "thumbnail_url": f"https://demo.felix.local/videos/{company.id}/thumb.jpg",
+            "video_url": f"https://demo.midas.local/videos/{company.id}/preview.mp4",
+            "thumbnail_url": f"https://demo.midas.local/videos/{company.id}/thumb.jpg",
             "storyboard": [
                 "Open on a 60-page contract on screen.",
                 f"Cut to {company.name} interface — start review.",

@@ -1,4 +1,4 @@
-import type { AgentKind } from "@/lib/types";
+import type { ActionOut, AgentKind } from "@/lib/types";
 
 type Identity = {
   bg: string;
@@ -30,4 +30,17 @@ export function agentVerbs(agent: AgentKind | null): {
     default:
       return { idle: "Open brief", done: "View brief" };
   }
+}
+
+/** Like agentVerbs but special-cases custom action subkinds
+ * (e.g. `site_blog` actions publish to the user's site rather than
+ * just drafting markdown). */
+export function actionVerbs(action: ActionOut): {
+  idle: string;
+  done: string;
+} {
+  if (action.kind === "site_blog") {
+    return { idle: "Publish to site", done: "View live post" };
+  }
+  return agentVerbs(action.suggested_agent);
 }

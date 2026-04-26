@@ -8,9 +8,11 @@ import {
   ExternalLink,
   FileCode,
   FileText,
+  Globe,
   GitBranch,
   GitPullRequestArrow,
   Loader2,
+  Lock,
   Pause,
   Play,
   Send,
@@ -42,6 +44,7 @@ import type {
   CodePrResult,
   CompanyOut,
   ProgressEvent,
+  SiteBlogResult,
   VideoResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -147,7 +150,7 @@ function RunFlow({
     };
   }, [agent, company.id]);
 
-  const stages = STAGE_DEFS[agent];
+  const stages = stagesFor(action);
   const totalMs = stages.reduce((a, s) => a + s.ms, 0);
 
   // Mock-stage timer (article + video only — code-pr is real-backend now).
@@ -183,7 +186,10 @@ function RunFlow({
   }, []);
 
   function start() {
-    if (agent === "code-pr") {
+    // site_blog actions are mock-only (publish-to-site flow), even though
+    // their suggested_agent is "code-pr" so they live under the Website
+    // identity. Skip the real-backend GitHub path for them.
+    if (agent === "code-pr" && action.kind !== "site_blog") {
       void startCodePrReal();
     } else {
       setState({ kind: "running", stage: 0, elapsed: 0 });
@@ -307,7 +313,11 @@ function RunFlow({
           config={config}
           onChange={setConfig}
           onGenerate={start}
-          canGenerate={agent !== "code-pr" || isCodePrConfigValid(config)}
+          canGenerate={
+            action.kind === "site_blog" ||
+            agent !== "code-pr" ||
+            isCodePrConfigValid(config)
+          }
         />
       )}
       {state.kind === "running" && (
@@ -417,6 +427,37 @@ const STAGE_DEFS: Record<AgentKind, StageDef[]> = {
   ],
 };
 
+// Site-blog stages: the article agent doing a real publish-to-site run.
+// Triggered when `action.kind === "site_blog"`.
+const SITE_BLOG_STAGES: StageDef[] = [
+  {
+    label: "Drafting the essay",
+    hint: "Writing 1,800 words of thought leadership",
+    ms: 3000,
+  },
+  {
+    label: "Generating cover image",
+    hint: "Composing hero image in your brand palette",
+    ms: 2200,
+  },
+  {
+    label: "Publishing to legora.com/blog",
+    hint: "Pushing to your CMS and rebuilding the page",
+    ms: 2200,
+  },
+  {
+    label: "Indexing for AI engines",
+    hint: "Sitemap update + IndexNow ping",
+    ms: 1500,
+  },
+];
+
+function stagesFor(action: ActionOut): StageDef[] {
+  if (action.kind === "site_blog") return SITE_BLOG_STAGES;
+  const agent = (action.suggested_agent ?? "article") as AgentKind;
+  return STAGE_DEFS[agent];
+}
+
 // ===== Config step ============================================================
 
 type Config = {
@@ -479,8 +520,14 @@ function ConfigStep({
   onGenerate: () => void;
   canGenerate: boolean;
 }) {
-  const verb =
-    agent === "article"
+  // site_blog uses the article-style customization (tone/length/FAQ) since
+  // it's writing a blog post, even though its agent is the website agent.
+  const isSiteBlog = action.kind === "site_blog";
+  const formAgent: AgentKind = isSiteBlog ? "article" : agent;
+
+  const verb = isSiteBlog
+    ? "Publish to site"
+    : agent === "article"
       ? "Draft article"
       : agent === "video"
         ? "Generate video"
@@ -500,13 +547,13 @@ function ConfigStep({
           Customize before running
         </div>
 
-        {agent === "article" && (
+        {formAgent === "article" && (
           <ArticleConfig config={config} onChange={onChange} action={action} />
         )}
-        {agent === "video" && (
+        {formAgent === "video" && (
           <VideoConfig config={config} onChange={onChange} action={action} />
         )}
-        {agent === "code-pr" && (
+        {formAgent === "code-pr" && (
           <WebsiteConfig config={config} onChange={onChange} action={action} />
         )}
 
@@ -539,7 +586,7 @@ function ConfigStep({
             <span aria-hidden>→</span>
           </span>
         </button>
-        {agent === "code-pr" && !canGenerate && (
+        {agent === "code-pr" && !isSiteBlog && !canGenerate && (
           <p className="mt-2 text-center font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground/85">
             Fill repo URL, token & site URL to continue
           </p>
@@ -837,7 +884,7 @@ function RunningStep({
   company: CompanyOut;
   config: Config;
 }) {
-  const stages = STAGE_DEFS[agent];
+  const stages = stagesFor(action);
   const current = stages[stage] ?? stages[stages.length - 1];
   const stagedElapsed = elapsed + Math.min(stages[stage]?.ms ?? 0, 0);
   const progress = Math.min(1, stagedElapsed / totalMs);
@@ -1232,7 +1279,7 @@ function StreamingFeed({
   useEffect(() => {
     setRevealed(0);
     if (items.length === 0) return;
-    const stageMs = STAGE_DEFS[agent][stage]?.ms ?? 2000;
+    const stageMs = stagesFor(action)[stage]?.ms ?? 2000;
     const perItem = Math.max(180, Math.floor(stageMs / (items.length + 0.5)));
     let i = 0;
     const tick = () => {
@@ -1297,6 +1344,43 @@ function streamItemsForStage(
     (action.target.format as string | undefined) ??
     "the prompt set";
   const domain = (action.target.domain as string | undefined) ?? "legora.com";
+
+  // site_blog: article agent in publish-to-site mode.
+  if (action.kind === "site_blog") {
+    const slug =
+      (action.target.slug as string | undefined) ??
+      "what-it-takes-to-lead-ai-change";
+    const audience =
+      (action.target.audience as string | undefined) ??
+      "BigLaw decision-makers";
+    if (stage === 0)
+      return [
+        `Loaded ${(action.target.citations_in_category as number) ?? 1184} citations on "${topic}"`,
+        `Audience locked · ${audience}`,
+        `Drafted opening · 218 words`,
+        `Wove in ${competitors[0]} comparison facts`,
+        `Closed with CTA → schedule a Legora demo`,
+      ];
+    if (stage === 1)
+      return [
+        `Composed cover · "AI lawyer at scale"`,
+        `Applied brand palette · #1F1A28 + #1E5BC9`,
+        `Optimized for OG card · 1200 × 630`,
+      ];
+    if (stage === 2)
+      return [
+        `Created post · slug: ${slug}`,
+        `Uploaded cover image to /assets/covers/`,
+        `Built static page · 142kb gzipped`,
+        `Added to /sitemap.xml`,
+      ];
+    return [
+      "Pinged ChatGPT crawler · queued",
+      "Pinged Perplexity · indexed",
+      "Pinged Claude search · queued",
+      "Live at legora.com/blog",
+    ];
+  }
 
   if (agent === "article") {
     if (stage === 0)
@@ -1389,7 +1473,7 @@ function streamItemsForStage(
   return [
     "Opened pull request on origin",
     config.draftPR ? "Marked as draft (no CI)" : "Marked ready for review",
-    "Linked to Felix action in PR body",
+    "Linked to MIDAS action in PR body",
     "Posted diff summary",
   ];
 }
@@ -1446,7 +1530,9 @@ function DeliverFooter({
         ? "Blog"
         : result.type === "video"
           ? "LinkedIn"
-          : "GitHub";
+          : result.type === "site-blog"
+            ? "legora.com/blog"
+            : "GitHub";
     publishDeliverable(deliverable.id, dest);
   }
 
@@ -1455,17 +1541,22 @@ function DeliverFooter({
       ? "Post to blog"
       : result.type === "video"
         ? "Publish to social"
-        : "Open PR on GitHub";
+        : result.type === "site-blog"
+          ? "Open live page"
+          : "Open PR on GitHub";
   const PublishIcon =
-    result.type === "article"
-      ? Send
-      : result.type === "video"
-        ? Send
-        : ExternalLink;
+    result.type === "code-pr" || result.type === "site-blog"
+      ? ExternalLink
+      : Send;
 
-  // For code-pr, "Publish" opens the actual PR URL in a new tab.
+  // External-link "Publish" buttons: code-pr opens the GitHub PR;
+  // site-blog opens the published page on the brand's own domain.
   const pubHref =
-    result.type === "code-pr" ? (result as CodePrResult).pr_url : undefined;
+    result.type === "code-pr"
+      ? (result as CodePrResult).pr_url
+      : result.type === "site-blog"
+        ? (result as SiteBlogResult).publish_url
+        : undefined;
 
   return (
     <div className="border-t border-[var(--border)] bg-white/70 px-7 py-3.5 backdrop-blur-md">
@@ -1547,7 +1638,112 @@ function formatScheduledAt(iso: string | null | undefined): string {
 function ResultBody({ result }: { result: AgentResult }) {
   if (result.type === "article") return <ArticleBody result={result} />;
   if (result.type === "video") return <VideoBody result={result} />;
+  if (result.type === "site-blog") return <SiteBlogBody result={result} />;
   return <CodePrBody result={result} />;
+}
+
+function SiteBlogBody({ result }: { result: SiteBlogResult }) {
+  const [iframeReady, setIframeReady] = useState(false);
+  const displayHost = (() => {
+    try {
+      return new URL(result.publish_url).host;
+    } catch {
+      return "your-site.com";
+    }
+  })();
+  const displayPath = (() => {
+    try {
+      return new URL(result.publish_url).pathname;
+    } catch {
+      return "/blog";
+    }
+  })();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+          <Globe className="size-3" />
+          Live · ~{result.word_count.toLocaleString()} words
+        </div>
+        <div className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-emerald-50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-700 ring-1 ring-inset ring-emerald-200">
+          <CheckCircle2 className="size-2.5" />
+          Published
+        </div>
+      </div>
+
+      {/* Browser-chrome wrapper around the live iframe. */}
+      <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-white shadow-[0_18px_40px_-20px_rgba(31,26,40,0.18)]">
+        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--ink-2)]/55 px-3 py-2">
+          <span className="flex gap-1.5">
+            <span className="size-2.5 rounded-full bg-[#FF5F57]" />
+            <span className="size-2.5 rounded-full bg-[#FEBC2E]" />
+            <span className="size-2.5 rounded-full bg-[#28C840]" />
+          </span>
+          <div className="ml-2 flex flex-1 items-center gap-1.5 truncate rounded-[var(--radius-pill)] border border-[var(--border)] bg-white px-2.5 py-1 font-mono text-[11px] text-rose/85">
+            <Lock className="size-2.5 shrink-0 text-emerald-600" />
+            <span className="truncate">
+              <span className="text-rose">{displayHost}</span>
+              <span className="text-muted-foreground">{displayPath}</span>
+            </span>
+          </div>
+          <a
+            href={result.publish_url}
+            target="_blank"
+            rel="noreferrer"
+            className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--ink-2)]/60 hover:text-rose"
+            title="Open in new tab"
+          >
+            <ExternalLink className="size-3" />
+          </a>
+        </div>
+        <div className="relative h-[520px] bg-white">
+          {!iframeReady && (
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-[var(--blue)]" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.22em]">
+                  Loading live page
+                </span>
+              </div>
+            </div>
+          )}
+          <iframe
+            src={result.preview_url}
+            title={result.title}
+            className={cn(
+              "h-full w-full border-0 transition-opacity duration-500",
+              iframeReady ? "opacity-100" : "opacity-0",
+            )}
+            loading="lazy"
+            onLoad={() => setIframeReady(true)}
+            sandbox="allow-scripts allow-same-origin allow-popups"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--ink-2)]/30 p-4">
+        <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          <Sparkles className="size-3" />
+          Indexing status
+        </div>
+        <ul className="space-y-1 text-[12px] text-rose/85">
+          <li className="flex items-center justify-between gap-2 font-mono">
+            <span>ChatGPT search · queued</span>
+            <span className="text-muted-foreground/85">~1h</span>
+          </li>
+          <li className="flex items-center justify-between gap-2 font-mono">
+            <span>Perplexity · indexed</span>
+            <CheckCircle2 className="size-3 text-emerald-600" />
+          </li>
+          <li className="flex items-center justify-between gap-2 font-mono">
+            <span>Claude search · queued</span>
+            <span className="text-muted-foreground/85">~2h</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 function ArticleBody({ result }: { result: ArticleResult }) {
@@ -2005,6 +2201,30 @@ function buildResult(
   agent: AgentKind,
   config: Config,
 ): AgentResult {
+  // site_blog overrides the plain article path: produces a SiteBlogResult
+  // that the panel renders as a live-site preview iframe.
+  if (action.kind === "site_blog") {
+    const previewUrl =
+      (action.target.preview_url as string | undefined) ?? "";
+    const publishUrl =
+      (action.target.publish_url as string | undefined) ??
+      `https://${company.own_domain ?? "example.com"}/blog/${
+        (action.target.slug as string | undefined) ?? "post"
+      }`;
+    const topic =
+      (action.target.topic as string | undefined) ?? "thought leadership";
+    const wordCount =
+      (action.target.word_count as number | undefined) ?? 1850;
+    return {
+      type: "site-blog",
+      title: action.title,
+      publish_url: publishUrl,
+      preview_url: previewUrl,
+      word_count: wordCount,
+      topic,
+    };
+  }
+
   if (agent === "article") {
     const wordCount =
       config.length === "concise"
@@ -2156,7 +2376,7 @@ AI excels at first-pass review, pattern recognition, and consistency checking. H
 
 ---
 
-*Drafted by Felix · ${own}. Tone: ${config.tone}. Schema: Article${config.includeFAQ ? " + FAQPage" : ""}.*
+*Drafted by MIDAS · ${own}. Tone: ${config.tone}. Schema: Article${config.includeFAQ ? " + FAQPage" : ""}.*
 `;
 
   return body;

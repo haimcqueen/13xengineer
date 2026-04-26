@@ -12,7 +12,7 @@ import StudioVideo from "@/components/studio/StudioVideo";
 import StudioWebsite from "@/components/studio/StudioWebsite";
 import SchedulerView from "@/components/SchedulerView";
 import OverviewPane from "@/components/OverviewPane";
-import { agentVerbs } from "@/lib/agentIdentity";
+import { actionVerbs } from "@/lib/agentIdentity";
 import {
   useDeliverables,
   type Deliverable,
@@ -436,7 +436,10 @@ function NextUpHero({
   outOf: number;
 }) {
   const agent = action.suggested_agent;
-  const verb = HERO_VERB[agent ?? "manual"];
+  const verb =
+    action.kind === "site_blog"
+      ? "Publish to your site"
+      : HERO_VERB[agent ?? "manual"];
   const accent =
     agent === "article"
       ? { bg: "rgba(199, 122, 122, 0.10)", fg: "#A85B5B" }
@@ -527,7 +530,7 @@ function ActionRow({
   isLast: boolean;
 }) {
   const agent = action.suggested_agent;
-  const verbs = agentVerbs(agent);
+  const verbs = actionVerbs(action);
 
   return (
     <button

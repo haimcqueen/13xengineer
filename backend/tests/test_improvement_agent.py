@@ -31,7 +31,7 @@ def _make_anthropic_mock(plan: dict):
 
 
 def _build_repo(tmp_path: Path) -> Path:
-    repo = tmp_path / "felix-repo-test" / "repo"
+    repo = tmp_path / "midas-repo-test" / "repo"
     repo.mkdir(parents=True)
     (repo / "index.html").write_text(
         "<html><head><title>Test</title></head><body></body></html>",
