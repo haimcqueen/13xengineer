@@ -79,63 +79,61 @@ export default function OverviewPane({ company }: Props) {
         <Legend />
       </div>
 
-      {/* HERO globe — fills the page, stats float in corners */}
-      <div className="relative flex-1 min-h-[680px]">
-        {/* The globe fills the container */}
-        <div className="absolute inset-0 grid place-items-center overflow-hidden">
+      {/* Two-column: globe (left, hero) + stats stacked on the right */}
+      <div
+        className="grid flex-1 min-h-[680px] gap-6"
+        style={{ gridTemplateColumns: "minmax(0, 1fr) 280px" }}
+      >
+        {/* Globe — hero, fills its column */}
+        <div className="relative grid place-items-center overflow-hidden">
           <MarketGlobe
             markets={company.market_stats ?? []}
-            width={1100}
-            height={780}
+            width={920}
+            height={760}
           />
         </div>
 
-        {/* Floating stats — top-left primary, top-right secondary,
-            bottom-left top market, bottom-right gap */}
-        <FloatingStat
-          className="absolute left-0 top-0"
-          delay={0.1}
-          label="Visibility"
-          value={`${Math.round(ownVis * 100)}%`}
-          sub="own brand · 30d"
-          delta="+5pp · 7d"
-          deltaTone="good"
-          tone="primary"
-        />
-        <FloatingStat
-          className="absolute right-0 top-0"
-          delay={0.2}
-          label="Avg position"
-          value={ownPos ? `#${ownPos.toFixed(1)}` : "—"}
-          sub="best in tracked set"
-          delta="−0.6 · 30d"
-          deltaTone="good"
-          tone="default"
-        />
-        <FloatingStat
-          className="absolute left-0 bottom-0"
-          delay={0.3}
-          label="Top market"
-          value={topMarket?.country_code ?? "—"}
-          sub={topMarket?.country_name ?? ""}
-          delta={
-            topMarket
-              ? `${Math.round(topMarket.visibility * 100)}% · #${topMarket.position.toFixed(1)}`
-              : ""
-          }
-          deltaTone="good"
-          tone="default"
-        />
-        <FloatingStat
-          className="absolute right-0 bottom-0"
-          delay={0.4}
-          label="Gap to leader"
-          value={`${gapToLeader >= 0 ? "+" : ""}${Math.round(gapToLeader * 100)}pp`}
-          sub={`vs ${leaderStat?.brand_name ?? "—"}`}
-          delta=""
-          deltaTone="bad"
-          tone="default"
-        />
+        {/* Stats column — right rail */}
+        <div className="flex flex-col gap-3">
+          <Stat
+            delay={0.1}
+            label="Visibility"
+            value={`${Math.round(ownVis * 100)}%`}
+            sub="own brand · 30d"
+            delta="+5pp · 7d"
+            deltaTone="good"
+            tone="primary"
+          />
+          <Stat
+            delay={0.2}
+            label="Avg position"
+            value={ownPos ? `#${ownPos.toFixed(1)}` : "—"}
+            sub="best in tracked set"
+            delta="−0.6 · 30d"
+            deltaTone="good"
+            tone="default"
+          />
+          <Stat
+            delay={0.3}
+            label="Gap to leader"
+            value={`${gapToLeader >= 0 ? "+" : ""}${Math.round(gapToLeader * 100)}pp`}
+            sub={`vs ${leaderStat?.brand_name ?? "—"}`}
+            delta=""
+            deltaTone="bad"
+            tone="default"
+          />
+          {topMarket && (
+            <Stat
+              delay={0.4}
+              label="Top market"
+              value={topMarket.country_code}
+              sub={topMarket.country_name}
+              delta={`${Math.round(topMarket.visibility * 100)}% · #${topMarket.position.toFixed(1)}`}
+              deltaTone="good"
+              tone="default"
+            />
+          )}
+        </div>
       </div>
     </motion.section>
   );
@@ -143,8 +141,7 @@ export default function OverviewPane({ company }: Props) {
 
 // ----------------------------------------------------------------------------
 
-function FloatingStat({
-  className,
+function Stat({
   delay,
   label,
   value,
@@ -153,7 +150,6 @@ function FloatingStat({
   deltaTone,
   tone,
 }: {
-  className: string;
   delay: number;
   label: string;
   value: string;
@@ -164,11 +160,9 @@ function FloatingStat({
 }) {
   return (
     <motion.div
-      className={`pointer-events-auto z-10 ${className}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.7, ease, delay }}
-      style={{ width: 220 }}
+      transition={{ duration: 0.6, ease, delay }}
     >
       <LGCard cornerRadius={18}>
         <div className="px-4 py-3.5">
