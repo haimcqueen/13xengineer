@@ -9,10 +9,12 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { Check, Loader2 } from "lucide-react";
 
 import LGCard from "@/components/LGCard";
 import { startResolve } from "@/lib/api";
 import type { ProgressEvent, ResolveError } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -141,6 +143,9 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
     Math.min(STEPS[stepIdx].minMs, Date.now() - stepEnteredAt.current);
   const progress = Math.min(1, elapsedMs / totalMs);
 
+  const isPeecStep =
+    STEPS[stepIdx].key === "matching" || STEPS[stepIdx].key === "loading";
+
   return (
     <motion.section
       key="resolving"
@@ -154,7 +159,7 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
         transition: { duration: 0.6, ease: [0.4, 0, 0.4, 1] },
       }}
     >
-      {/* Slow breathing aura — no logo */}
+      {/* Slow breathing aura behind the card */}
       <motion.span
         aria-hidden
         className="pointer-events-none absolute rounded-full"
@@ -185,8 +190,8 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
         </span>
       </div>
 
-      {/* The single liquid-glass card */}
-      <div className="mt-8 w-full max-w-[440px]">
+      {/* Single liquid-glass card · matches the studio drafting overlays */}
+      <div className="mt-8 w-full max-w-[480px]">
         <LGCard cornerRadius={22}>
           <div className="px-7 py-7">
             <AnimatePresence mode="wait">
@@ -214,12 +219,13 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
                     }}
                   />
                   Step {stepIdx + 1} · {STEPS.length}
+                  {isPeecStep && <PeecAttribution />}
                 </div>
                 <h2
                   className="text-rose"
                   style={{
                     fontFamily: "var(--font-sans)",
-                    fontSize: "clamp(1.65rem, 3vw, 2rem)",
+                    fontSize: "clamp(1.55rem, 2.8vw, 1.85rem)",
                     fontWeight: 500,
                     letterSpacing: "-0.028em",
                     lineHeight: 1.1,
@@ -234,6 +240,71 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
                 )}
               </motion.div>
             </AnimatePresence>
+
+            {/* Full stage list — same pattern as the studio drafting overlay */}
+            <ol className="mt-6 space-y-2 text-[12px]">
+              {STEPS.slice(0, -1).map((s, i) => {
+                const done = i < stepIdx;
+                const active = i === stepIdx;
+                const usesPeec = s.key === "matching" || s.key === "loading";
+                return (
+                  <li
+                    key={s.key}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/55 px-3 py-2",
+                      active && "ring-1 ring-[rgba(30,91,201,0.25)]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-5 place-items-center rounded-full",
+                        done
+                          ? "bg-emerald-500 text-white"
+                          : active
+                            ? "bg-[rgba(30,91,201,0.10)] text-[var(--blue)]"
+                            : "bg-[var(--ink-2)]/60 text-muted-foreground",
+                      )}
+                    >
+                      {done ? (
+                        <Check className="size-3" strokeWidth={3} />
+                      ) : active ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <span className="size-1 rounded-full bg-current opacity-40" />
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "flex-1 truncate",
+                        active
+                          ? "text-rose"
+                          : done
+                            ? "text-rose/85"
+                            : "text-muted-foreground/70",
+                      )}
+                    >
+                      {s.label}
+                    </span>
+                    {usesPeec && (
+                      <img
+                        src="/peec-logo.svg"
+                        alt="Peec"
+                        aria-label="powered by Peec"
+                        className={cn(
+                          "h-2.5 w-auto shrink-0",
+                          active
+                            ? "opacity-90"
+                            : done
+                              ? "opacity-60"
+                              : "opacity-35",
+                        )}
+                        style={{ filter: "saturate(0)" }}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
           </div>
 
           {/* Hairline progress thread */}
@@ -255,6 +326,24 @@ export default function ResolvingView({ input, onResolved, onError }: Props) {
         }
       `}</style>
     </motion.section>
+  );
+}
+
+// ---- Peec attribution chip — appears beside the step counter when the
+// active step talks to Peec (matching / loading visibility data).
+function PeecAttribution() {
+  return (
+    <span className="ml-auto inline-flex items-center gap-1.5 normal-case tracking-normal">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground/85">
+        via
+      </span>
+      <img
+        src="/peec-logo.svg"
+        alt="Peec"
+        className="h-3 w-auto opacity-85"
+        style={{ filter: "saturate(0)" }}
+      />
+    </span>
   );
 }
 
