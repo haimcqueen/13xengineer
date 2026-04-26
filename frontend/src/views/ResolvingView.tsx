@@ -41,36 +41,36 @@ const STEPS: Step[] = [
   {
     key: "reading",
     label: "Reading the site",
-    hint: "Fetching pages with Exa",
-    minMs: 3200,
+    hint: "Fetching pages",
+    minMs: 1100,
   },
   {
     key: "mapping",
     label: "Mapping the brand",
     hint: "Industry · markets · competitors",
-    minMs: 3000,
+    minMs: 1100,
   },
   {
     key: "matching",
     label: "Resolving on Peec",
     hint: "Project · prompt bank · brands",
-    minMs: 3000,
+    minMs: 900,
   },
   {
     key: "loading",
     label: "Loading visibility data",
     hint: "30-day reports across engines",
-    minMs: 2800,
+    minMs: 1100,
   },
   {
     key: "ready",
     label: "Ready",
     hint: "",
-    minMs: 500,
+    minMs: 300,
   },
 ];
 
-const SETTLE_MS = 500;
+const SETTLE_MS = 300;
 
 // Map backend events → which step we're on. Events arrive over the lifetime
 // of the resolve; the step machine only ever advances, so out-of-order

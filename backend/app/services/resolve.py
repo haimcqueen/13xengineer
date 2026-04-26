@@ -1,7 +1,22 @@
+"""Trimmed resolve pipeline.
+
+Hackathon scope: only fetches the Peec data the frontend actually consumes
+(prompts count, /brands for own_brand + is_own lookup, /topics for the
+topic list). Everything else (`/tags`, `/models`, `/reports/*`, the live
+MCP loop, the Exa crawl) is dropped or mocked because the frontend never
+displays it and the real calls add 30-90s of cold-start latency.
+
+If you need the full pipeline back, the dropped paths are still in
+`app.services.peec_rest`, `app.services.peec_mcp.RealMCPClient`, and
+`app.services.site_intel.crawl_with_exa` — they just aren't wired here.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -9,19 +24,23 @@ from app.config import settings
 from app.models import Company, Job, PeecSnapshot
 from app.services import jobs as jobs_svc
 from app.services import peec_actions
-from app.services.company_match import MatchedProject, MatchFailure, resolve as match_resolve
-from app.services.peec_mcp import get_mcp_client
-from app.services.peec_rest import PeecError, PeecRestClient
-from app.services.site_intel import crawl_with_exa
+from app.services.company_match import (
+    MatchedProject,
+    MatchFailure,
+    resolve as match_resolve,
+)
+from app.services.mock_reports import (
+    synthesize_brand_report,
+    synthesize_market_report,
+)
+from app.services.peec_mcp import FixtureMCPClient
+from app.services.peec_rest import PeecRestClient
 
 logger = logging.getLogger(__name__)
 
 
 def find_fresh_company(db: Session, user_input: str) -> Company | None:
-    """Return a Company whose latest snapshot is within TTL, if any.
-
-    Match by user_input domain or name first, fall back to None.
-    """
+    """Return a Company whose latest snapshot is within TTL, if any."""
     from app.services.company_match import _normalize_domain
 
     domain = _normalize_domain(user_input)
@@ -51,29 +70,23 @@ def find_fresh_company(db: Session, user_input: str) -> Company | None:
     )
     if not snap:
         return None
-    age = (datetime.now(timezone.utc) - snap.fetched_at.replace(tzinfo=timezone.utc)).total_seconds()
+    age = (
+        datetime.now(timezone.utc) - snap.fetched_at.replace(tzinfo=timezone.utc)
+    ).total_seconds()
     if age > settings.snapshot_ttl_seconds:
         return None
     return company
 
 
 async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
-    """The cold-path resolve flow. Emits progress events into the job row.
+    """Cold-path resolve. Emits progress events into the job row.
 
-    Steps: exa-crawl → match → fetch (parallel REST) → mcp actions → snapshot + actions.
-    Errors bubble up to run_in_background which marks the job failed.
+    Steps: match → fetch (3 cheap REST calls in parallel) → mock reports →
+    fixture actions → snapshot + actions.
     """
 
-    # Stage 0 — fetch the brand site via Exa so the resolve feels live.
-    # Failure here is non-fatal: the rest of the pipeline still runs.
-    async def emit(event_type: str, data: dict) -> None:
-        jobs_svc.append_event(db, job_id, event_type, data)
-
-    try:
-        await crawl_with_exa(user_input, on_event=emit)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("crawl_with_exa failed: %s", e)
-
+    # 1. Match against Peec (real). This is the only outbound call we can't
+    #    skip — the rest of the system keys off the resolved project_id.
     match = await match_resolve(user_input)
     if isinstance(match, MatchFailure):
         jobs_svc.append_event(
@@ -92,6 +105,7 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
 
     assert isinstance(match, MatchedProject)
 
+    # 2. Persist Company.
     company = (
         db.query(Company).filter(Company.peec_project_id == match.project_id).first()
     )
@@ -117,7 +131,11 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
         db,
         job_id,
         "project_matched",
-        {"company_id": company.id, "name": company.name, "own_domain": company.own_domain},
+        {
+            "company_id": company.id,
+            "name": company.name,
+            "own_domain": company.own_domain,
+        },
     )
 
     job_row = db.get(Job, job_id)
@@ -125,21 +143,21 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
         job_row.company_id = company.id
         db.commit()
 
-    # 30-day window for /reports/* analytics
-    today = datetime.now(timezone.utc).date()
-    end_date = today.isoformat()
-    start_date = (today - timedelta(days=30)).isoformat()
-
+    # 3. Three cheap parallel REST calls — only what the frontend reads.
     async with PeecRestClient() as client:
 
         async def fetch_prompts():
             data = await client.get_prompts(match.project_id)
-            jobs_svc.append_event(db, job_id, "prompts_loaded", {"count": len(data.get("data", []))})
+            jobs_svc.append_event(
+                db, job_id, "prompts_loaded", {"count": len(data.get("data", []))}
+            )
             return data
 
         async def fetch_brands():
             data = await client.get_brands(match.project_id)
-            own = next((b for b in data.get("data", []) if b.get("is_own")), None)
+            own = next(
+                (b for b in data.get("data", []) if b.get("is_own")), None
+            )
             jobs_svc.append_event(
                 db,
                 job_id,
@@ -157,95 +175,44 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
 
         async def fetch_topics():
             data = await client.get_topics(match.project_id)
-            jobs_svc.append_event(db, job_id, "topics_loaded", {"count": len(data.get("data", []))})
+            jobs_svc.append_event(
+                db, job_id, "topics_loaded", {"count": len(data.get("data", []))}
+            )
             return data
 
-        async def fetch_tags():
-            return await client.get_tags(match.project_id)
-
-        async def fetch_models():
-            return await client.get_models(match.project_id)
-
-        async def fetch_brand_report():
-            try:
-                return await client.get_brand_report(
-                    match.project_id, start_date=start_date, end_date=end_date, limit=20
-                )
-            except Exception as e:  # noqa: BLE001
-                logger.warning("brand_report fetch failed: %s", e)
-                return {"data": []}
-
-        async def fetch_domain_report():
-            try:
-                return await client.get_domain_report(
-                    match.project_id, start_date=start_date, end_date=end_date, limit=30
-                )
-            except Exception as e:  # noqa: BLE001
-                logger.warning("domain_report fetch failed: %s", e)
-                return {"data": []}
-
-        (
-            prompts,
-            brands,
-            topics,
-            tags,
-            models_payload,
-            brand_report,
-            domain_report,
-        ) = await asyncio.gather(
-            fetch_prompts(),
-            fetch_brands(),
-            fetch_topics(),
-            fetch_tags(),
-            fetch_models(),
-            fetch_brand_report(),
-            fetch_domain_report(),
+        prompts, brands, topics = await asyncio.gather(
+            fetch_prompts(), fetch_brands(), fetch_topics()
         )
 
-        # Per-country breakdown for own brand → drives the globe + market view.
-        own_brand_id = next(
-            (b.get("id") for b in (brands or {}).get("data", []) if b.get("is_own")),
-            None,
-        )
-        market_report: dict = {"data": []}
-        if own_brand_id:
-            try:
-                market_report = await client.get_brand_report(
-                    match.project_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    dimensions=["country_code"],
-                    filters=[
-                        {"field": "brand_id", "operator": "in", "values": [own_brand_id]}
-                    ],
-                    limit=50,
-                )
-            except Exception as e:  # noqa: BLE001
-                logger.warning("market_report fetch failed: %s", e)
+    # 4. Mock the analytics reports (frontend-visible: brand_stats, market_stats).
+    brand_report = synthesize_brand_report(brands)
+    market_report = synthesize_market_report(brands, match.project_id)
+    jobs_svc.append_event(db, job_id, "reports_loaded", {})
 
-        jobs_svc.append_event(db, job_id, "reports_loaded", {})
-
-    mcp = get_mcp_client()
+    # 5. Mock the actions via the fixture client (instant — no Anthropic call).
     jobs_svc.append_event(db, job_id, "actions_pending", {})
+    fixture = FixtureMCPClient()
     try:
-        mcp_actions = await mcp.get_actions(match.project_id)
-    except Exception as e:  # noqa: BLE001 — MCP failure must not break resolve
-        logger.warning("mcp.get_actions failed: %s", e)
+        mcp_actions = await fixture.get_actions(match.project_id)
+    except Exception as e:  # noqa: BLE001 — non-fatal
+        logger.warning("fixture actions failed: %s", e)
         mcp_actions = []
     jobs_svc.append_event(db, job_id, "actions_loaded", {"count": len(mcp_actions)})
 
+    # 6. Persist snapshot + derived actions.
     snapshot = PeecSnapshot(
         id=f"s_{uuid.uuid4()}",
         company_id=company.id,
         prompts=prompts,
         brands=brands,
         topics=topics,
-        tags=tags,
-        models=models_payload,
+        # tags / models are required by the schema but never read; pass empty.
+        tags={"data": []},
+        models={"data": []},
         mcp_actions_raw={"actions": list(mcp_actions)} if mcp_actions else None,
         brand_report=brand_report,
         market_report=market_report,
-        domain_report=domain_report,
+        domain_report=None,
     )
     db.add(snapshot)
     db.flush()  # need snapshot.id for actions
@@ -260,11 +227,9 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
     jobs_svc.mark_done(db, job_id, {"company_id": company.id})
 
 
-def hydrate_cache_hit_job(
-    db: Session, job_id: str, company: Company
-) -> None:
-    """Populate a job for a cache-hit resolve so the SSE stream replays
-    the same event sequence the cold path produces."""
+def hydrate_cache_hit_job(db: Session, job_id: str, company: Company) -> None:
+    """Replay the same event sequence on a cache hit so the SSE stream
+    looks identical to the cold path."""
     snap = (
         db.query(PeecSnapshot)
         .filter(PeecSnapshot.company_id == company.id)
@@ -273,14 +238,24 @@ def hydrate_cache_hit_job(
     )
     own = None
     if snap is not None:
-        own = next((b for b in (snap.brands or {}).get("data", []) if b.get("is_own")), None)
+        own = next(
+            (b for b in (snap.brands or {}).get("data", []) if b.get("is_own")),
+            None,
+        )
 
     events: list[tuple[str, dict]] = [
         (
             "project_matched",
-            {"company_id": company.id, "name": company.name, "own_domain": company.own_domain},
+            {
+                "company_id": company.id,
+                "name": company.name,
+                "own_domain": company.own_domain,
+            },
         ),
-        ("prompts_loaded", {"count": len((snap.prompts or {}).get("data", []) if snap else [])}),
+        (
+            "prompts_loaded",
+            {"count": len((snap.prompts or {}).get("data", []) if snap else [])},
+        ),
         (
             "brands_loaded",
             {
@@ -292,10 +267,20 @@ def hydrate_cache_hit_job(
                 ),
             },
         ),
-        ("topics_loaded", {"count": len((snap.topics or {}).get("data", []) if snap else [])}),
+        (
+            "topics_loaded",
+            {"count": len((snap.topics or {}).get("data", []) if snap else [])},
+        ),
+        ("reports_loaded", {}),
         (
             "actions_loaded",
-            {"count": len(((snap.mcp_actions_raw or {}).get("actions") or []) if snap else [])},
+            {
+                "count": len(
+                    ((snap.mcp_actions_raw or {}).get("actions") or [])
+                    if snap
+                    else []
+                )
+            },
         ),
         ("done", {"company_id": company.id}),
     ]
