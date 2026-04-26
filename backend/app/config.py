@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-4-6"
 
     exa_api_key: str = ""
+    tavily_api_key: str = ""
 
     snapshot_ttl_seconds: int = 600
 

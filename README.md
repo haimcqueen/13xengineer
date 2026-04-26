@@ -48,7 +48,7 @@ Built for the Peec hackathon. Demo target: **Legora** (`legora.com`).
 | HTTP client | httpx |
 | Streaming | sse-starlette (Server-Sent Events) |
 | AI | Anthropic Claude SDK (`anthropic` >=0.40) |
-| Web research | Exa (`exa-py` >=2.12) |
+| Web research | Exa (`exa-py` >=2.12) for site crawl, Tavily (`tavily-python` >=0.5) for live article research |
 | Package manager | [uv](https://docs.astral.sh/uv/) |
 
 ### Frontend
@@ -72,7 +72,8 @@ Built for the Peec hackathon. Demo target: **Legora** (`legora.com`).
 - **Node.js 20+** and npm
 - A **Peec API key** (from your Peec dashboard)
 - An **Anthropic API key** (for Claude — agents + MCP action analysis)
-- An **Exa API key** (for article research; optional but recommended)
+- An **Exa API key** (for the resolve pipeline's site crawl; optional but recommended)
+- A **Tavily API key** (for live web research in Tolkien; optional but recommended)
 - A **GitHub personal access token** (only required for the Code-PR agent)
 
 ---
@@ -134,7 +135,8 @@ PEEC_API_KEY=<your peec key>
 ANTHROPIC_API_KEY=<your anthropic key>
 
 # Optional but recommended
-EXA_API_KEY=<your exa key>            # enables real web research in Article agent
+EXA_API_KEY=<your exa key>            # site crawl + brand intel for the resolve pipeline
+TAVILY_API_KEY=<your tavily key>      # live web research for Tolkien (article agent)
 
 # Peec MCP
 PEEC_USE_REAL_MCP=false               # set to true after running connect_peec
@@ -394,10 +396,10 @@ Analyzes a live website for AEO/SEO markup deficiencies and ships a GitHub pull 
 Writes complete SEO/AEO-optimized blog articles that read like a human copywriter wrote them.
 
 **Flow:**
-1. Starts from the action's rationale and company positioning.
-2. Searches for supporting research via **Exa** (semantic web search) — deep keyword research, competitor content, and source material.
-3. Structures the argument (outline, heading hierarchy, FAQ candidates).
-4. Calls **Claude** to write the full article. Every sentence earns its place.
+1. **Brief** — Claude generates a keyword strategy, search intent analysis, and competitor gaps from the action's rationale and company positioning.
+2. **Research** — pulls live web sources via **Tavily** (synthesized answer + ranked source list with snippets), then Claude folds those citations into a structured research doc.
+3. **Outline** — Claude structures the argument (H2/H3 hierarchy, FAQ candidates, Quick Answer block for LLM citation).
+4. **Write** — Claude writes the full 1,500–2,500 word article in markdown. Every sentence earns its place.
 
 **Output:** Markdown article + metadata (title, word count, suggested slug, tags).
 
@@ -592,7 +594,8 @@ Both the SSE endpoint and the `GET /api/jobs/{id}` poll endpoint read from the s
 | [Peec REST API](https://peec.ai) | Brand data — prompts, brands, topics, market share | Yes |
 | [Peec MCP Server](https://peec.ai) | AI-powered action generation via OAuth-gated MCP | No (fixture fallback) |
 | [Anthropic Claude API](https://anthropic.com) | All AI generation — Tolkien articles, Michelangelo improvement plans, action analysis | Yes |
-| [Exa Search](https://exa.ai) | Semantic web research for Tolkien (keyword research, competitor content) | Recommended |
+| [Exa Search](https://exa.ai) | Site crawl + brand intel for the resolve pipeline (`services/site_intel.py`) | Recommended |
+| [Tavily Search](https://tavily.com) | Live web research feeding Tolkien's research stage (`services/tavily.py`) | Recommended |
 | GitHub API | Open pull requests from Michelangelo (via personal access token) | Only for Michelangelo |
 
 ### Claude usage
@@ -603,4 +606,5 @@ Both the SSE endpoint and the `GET /api/jobs/{id}` poll endpoint read from the s
 
 ### Fallback behavior
 - If Peec MCP is unavailable: `FallbackMCPClient` serves actions from `fixtures/legora_actions.json`.
-- If Exa is unconfigured: Tolkien uses only the action's built-in rationale and company context.
+- If Exa is unconfigured: the resolve pipeline still produces a `SiteIntel` containing the normalized domain so the SSE stream completes.
+- If Tavily is unconfigured (or errors out): `services/tavily.py` returns an empty result and Tolkien falls back to Claude-only research without breaking the pipeline.

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import Action, Company
 from app.services import jobs as jobs_svc
+from app.services import tavily as tavily_svc
 
 logger = logging.getLogger(__name__)
 
@@ -85,12 +86,30 @@ class ArticleAgent:
                 f"Create a topic brief for this article:\n\n{context}"
             ))
 
-            # Step 2: Research
+            # Step 2: Research — pull live web sources via Tavily, then have
+            # Claude synthesize. Tavily failures fall through to Claude-only.
+            self._emit(db, job_id, "Searching the web (Tavily)")
+            tavily_query = f"{topic} {company_name} industry analysis 2025"
+            tavily_search = await tavily_svc.search(tavily_query, max_results=6)
+            if not tavily_search.is_empty:
+                self._emit(
+                    db,
+                    job_id,
+                    f"Found {len(tavily_search.results)} sources",
+                )
+
             self._emit(db, job_id, "Deep research & data collection")
-            research = await self._call(client, _RESEARCH_SYSTEM, (
+            web_block = tavily_search.to_prompt_block()
+            research_user = (
                 f"Research this topic deeply. Here is the brief:\n\n{brief}\n\n"
                 f"Original context:\n{context}"
-            ))
+            )
+            if web_block:
+                research_user += (
+                    f"\n\nLive web sources to cite where relevant "
+                    f"(prefer these over generic claims):\n\n{web_block}"
+                )
+            research = await self._call(client, _RESEARCH_SYSTEM, research_user)
 
             # Step 3: Outline
             self._emit(db, job_id, "Structuring the article")

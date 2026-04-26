@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project nature
 
-Hackathon project ("Felix · by Peec"). Lean toward shipping working features over production-grade refactors — skip CI/deployment/auth ceremony unless explicitly asked. Demo target is **Legora** (`legora.com`); other tracked companies are BMW, Revolut, Mindspace, Nothing Phone.
+Hackathon project ("Midas · by Peec"). Lean toward shipping working features over production-grade refactors — skip CI/deployment/auth ceremony unless explicitly asked. Demo target is **Legora** (`legora.com`); other tracked companies are BMW, Revolut, Mindspace, Nothing Phone.
+
+The product surface presents three named agents — **Michelangelo** (builder, maps to internal `improvement` + `code-pr` kinds), **Tolkien** (writer, `article`), and **Nolan** (director, `video`). The character names are display-only; routes, registry keys, DB columns, and agent-kind enums all use the internal strings. Don't rename them in code without updating the API contract.
 
 ## Commands
 
@@ -124,4 +126,4 @@ CORS_ORIGINS=["http://localhost:5173"]
 
 ## Blog pipeline (separate workflow)
 
-The `.claude/commands/blog-*` slash commands and `.claude/agents/blog-*` agents drive a multi-step blog generation pipeline that writes drafts into `blog/content/drafts/`. SEO/AEO rules live in `.claude/rules/blog-seo.md`. Image generation scripts are under `scripts/`. This is independent of the Felix product code — touch it only when working on blog content.
+The `.claude/commands/blog-*` slash commands and `.claude/agents/blog-*` agents drive a multi-step blog generation pipeline that writes drafts into `blog/content/drafts/`. SEO/AEO rules live in `.claude/rules/blog-seo.md`. Image generation scripts are under `scripts/`. This is independent of the Midas product code — touch it only when working on blog content.
