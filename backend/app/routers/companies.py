@@ -11,11 +11,120 @@ from app.models import Action, Company, Job, PeecSnapshot
 from app.schemas import (
     ActionOut,
     BrandOut,
+    BrandStat,
     CompanyOut,
     CompanyResolveRequest,
     CompanyResolveResponse,
+    MarketStat,
     TopicOut,
 )
+
+
+# ISO-3166-1 alpha-2 → display name + centroid (lat, lng).
+# Only the markets we track actively need to land here.
+_COUNTRIES: dict[str, tuple[str, float, float]] = {
+    "US": ("United States",  39.8, -98.6),
+    "GB": ("United Kingdom", 54.0,  -2.0),
+    "DE": ("Germany",        51.2,  10.5),
+    "AT": ("Austria",        47.5,  14.0),
+    "CH": ("Switzerland",    46.8,   8.2),
+    "SE": ("Sweden",         60.1,  18.6),
+    "NO": ("Norway",         60.5,   8.5),
+    "DK": ("Denmark",        56.0,  10.0),
+    "FI": ("Finland",        64.0,  26.0),
+    "FR": ("France",         46.6,   2.2),
+    "ES": ("Spain",          40.5,  -3.7),
+    "PL": ("Poland",         51.9,  19.1),
+    "CA": ("Canada",         56.1, -106.3),
+    "AU": ("Australia",     -25.3, 133.8),
+    "IN": ("India",          20.6,  79.0),
+    "NL": ("Netherlands",    52.1,   5.3),
+    "BE": ("Belgium",        50.5,   4.5),
+    "IT": ("Italy",          41.9,  12.5),
+    "PT": ("Portugal",       39.4,  -8.2),
+    "IE": ("Ireland",        53.1,  -7.7),
+    "BR": ("Brazil",        -14.2, -51.9),
+    "MX": ("Mexico",         23.6, -102.5),
+    "JP": ("Japan",          36.2, 138.3),
+    "SG": ("Singapore",       1.4, 103.8),
+}
+
+
+def _build_brand_stats(snap_brands: dict, brand_report: dict | None) -> list[BrandStat]:
+    """Merge `/brands` (which has is_own) with `/reports/brands` (which has metrics)."""
+    if not brand_report:
+        return []
+    own_lookup = {
+        b.get("id"): bool(b.get("is_own"))
+        for b in (snap_brands or {}).get("data", [])
+    }
+    out: list[BrandStat] = []
+    for row in brand_report.get("data", []):
+        brand = row.get("brand") or {}
+        bid = brand.get("id")
+        if not bid:
+            continue
+        out.append(
+            BrandStat(
+                brand_id=bid,
+                brand_name=brand.get("name") or "",
+                visibility=float(row.get("visibility") or 0),
+                share_of_voice=float(row.get("share_of_voice") or 0),
+                sentiment=float(row.get("sentiment") or 0),
+                position=float(row.get("position") or 0),
+                mention_count=int(row.get("mention_count") or 0),
+                is_own=own_lookup.get(bid, False),
+            )
+        )
+    out.sort(key=lambda b: -b.visibility)
+    return out
+
+
+def _build_market_stats(
+    market_report: dict | None, prompts: dict
+) -> list[MarketStat]:
+    """Per-country stats for the OWN brand. Joins market_report rows
+    with country metadata + per-country prompt counts."""
+    if not market_report:
+        return []
+
+    # Count prompts per user_location.country
+    prompt_counts: dict[str, int] = {}
+    for p in (prompts or {}).get("data", []):
+        loc = p.get("user_location") or {}
+        cc = loc.get("country")
+        if cc:
+            prompt_counts[cc] = prompt_counts.get(cc, 0) + 1
+
+    out: list[MarketStat] = []
+    for row in market_report.get("data", []):
+        cc = row.get("country_code")
+        if not cc or cc not in _COUNTRIES:
+            continue
+        name, lat, lng = _COUNTRIES[cc]
+        out.append(
+            MarketStat(
+                country_code=cc,
+                country_name=name,
+                lat=lat,
+                lng=lng,
+                prompt_count=prompt_counts.get(cc, 0),
+                visibility=float(row.get("visibility") or 0),
+                position=float(row.get("position") or 0),
+            )
+        )
+    out.sort(key=lambda m: -m.visibility)
+    return out
+
+
+def _total_chats(brand_report: dict | None) -> int:
+    """visibility_total is project-wide and identical across rows — pick any."""
+    if not brand_report:
+        return 0
+    rows = brand_report.get("data") or []
+    if not rows:
+        return 0
+    return int(rows[0].get("visibility_total") or 0)
 from app.services import jobs as jobs_svc
 from app.services import resolve as resolve_svc
 
@@ -129,6 +238,10 @@ def get_company(company_id: str, db: Session = Depends(get_db)) -> CompanyOut:
     if fetched_at.tzinfo is None:
         fetched_at = fetched_at.replace(tzinfo=timezone.utc)
 
+    brand_stats = _build_brand_stats(snap.brands or {}, snap.brand_report)
+    market_stats = _build_market_stats(snap.market_report, snap.prompts or {})
+    total_chats = _total_chats(snap.brand_report)
+
     return CompanyOut(
         id=company.id,
         name=company.name,
@@ -137,6 +250,9 @@ def get_company(company_id: str, db: Session = Depends(get_db)) -> CompanyOut:
         topics=topics,
         prompt_count=len((snap.prompts or {}).get("data", [])),
         last_refreshed_at=fetched_at,
+        brand_stats=brand_stats,
+        market_stats=market_stats,
+        total_chats=total_chats,
     )
 
 

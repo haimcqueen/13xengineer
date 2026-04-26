@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 
 import Atmosphere from "@/components/Atmosphere";
@@ -7,8 +7,8 @@ import EntryView from "@/views/EntryView";
 import NoMatchView from "@/views/NoMatchView";
 import ResolvingView from "@/views/ResolvingView";
 import Workspace from "@/views/Workspace";
-import { getActions, getCompany } from "@/lib/mockBackend";
-import type { ResolveError } from "@/lib/types";
+import { getActions, getCompany } from "@/lib/api";
+import type { ActionOut, CompanyOut, ResolveError } from "@/lib/types";
 
 type View = "entry" | "resolving" | "insights" | "no-match";
 
@@ -16,16 +16,36 @@ export default function Home() {
   const [view, setView] = useState<View>("entry");
   const [input, setInput] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [company, setCompany] = useState<CompanyOut | null>(null);
+  const [actions, setActions] = useState<ActionOut[]>([]);
   const [error, setError] = useState<ResolveError | null>(null);
 
-  const company = useMemo(
-    () => (companyId ? getCompany(companyId) : null),
-    [companyId],
-  );
-  const actions = useMemo(
-    () => (companyId ? getActions(companyId) : []),
-    [companyId],
-  );
+  useEffect(() => {
+    if (!companyId) {
+      setCompany(null);
+      setActions([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([getCompany(companyId), getActions(companyId)])
+      .then(([c, a]) => {
+        if (cancelled) return;
+        setCompany(c);
+        setActions(a);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError({
+          code: "peec_unavailable",
+          message: e instanceof Error ? e.message : "Failed to load company",
+          tracked: [],
+        });
+        setView("no-match");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
 
   function submit() {
     const v = input.trim();

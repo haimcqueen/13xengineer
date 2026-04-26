@@ -50,100 +50,35 @@ const id = (prefix: string) =>
   `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 
 // ----- tracked companies --------------------------------------------------
+//
+// Only Legora is mocked. Every other input falls through to NoMatchView.
+// The new ResolvingView animation is hardcoded for legora.com so adding
+// other companies would mean reworking that view too.
 
-export const TRACKED_COMPANIES = [
-  "Legora",
-  "BMW",
-  "Revolut",
-  "Mindspace",
-  "Nothing Phone",
-] as const;
+export const TRACKED_COMPANIES = ["Legora"] as const;
 
-type CompanyKey = "legora" | "bmw" | "revolut" | "mindspace" | "nothing-phone";
-
-const COMPANIES: Record<CompanyKey, CompanyOut> = {
-  legora: {
-    id: "c_legora",
-    name: "Legora Project",
-    own_domain: "legora.com",
-    own_brand: {
-      id: "b_legora",
-      name: "Legora",
-      domains: ["legora.com"],
-      is_own: true,
-    },
-    topics: [
-      { id: "t_legora_1", name: "Comparisons & Alternatives" },
-      { id: "t_legora_2", name: "M&A & Due Diligence" },
-      { id: "t_legora_3", name: "BigLaw & Enterprise" },
-      { id: "t_legora_4", name: "EU & Compliance" },
-      { id: "t_legora_5", name: "Workflows & Office Integration" },
-    ],
-    prompt_count: 421,
-    last_refreshed_at: now(),
-    brand_stats: LEGORA_BRAND_STATS,
-    market_stats: LEGORA_MARKET_STATS,
-    total_chats: 12597,
+const LEGORA: CompanyOut = {
+  id: "c_legora",
+  name: "Legora Project",
+  own_domain: "legora.com",
+  own_brand: {
+    id: "b_legora",
+    name: "Legora",
+    domains: ["legora.com"],
+    is_own: true,
   },
-  bmw: {
-    id: "c_bmw",
-    name: "BMW",
-    own_domain: "bmw.com",
-    own_brand: {
-      id: "b_bmw",
-      name: "BMW",
-      domains: ["bmw.com", "bmw.de"],
-      is_own: true,
-    },
-    topics: [
-      { id: "t_bmw_1", name: "Premium electric vehicles" },
-      { id: "t_bmw_2", name: "Luxury car comparisons" },
-    ],
-    prompt_count: 18,
-    last_refreshed_at: now(),
-  },
-  revolut: {
-    id: "c_revolut",
-    name: "Revolut",
-    own_domain: "revolut.com",
-    own_brand: {
-      id: "b_revolut",
-      name: "Revolut",
-      domains: ["revolut.com"],
-      is_own: true,
-    },
-    topics: [{ id: "t_revolut_1", name: "Digital banking in Europe" }],
-    prompt_count: 22,
-    last_refreshed_at: now(),
-  },
-  mindspace: {
-    id: "c_mindspace",
-    name: "Mindspace",
-    own_domain: "mindspace.me",
-    own_brand: {
-      id: "b_mindspace",
-      name: "Mindspace",
-      domains: ["mindspace.me"],
-      is_own: true,
-    },
-    topics: [{ id: "t_mindspace_1", name: "Coworking and flex office space" }],
-    prompt_count: 14,
-    last_refreshed_at: now(),
-  },
-  "nothing-phone": {
-    id: "c_nothing",
-    name: "Nothing Phone",
-    own_domain: "nothing.tech",
-    own_brand: {
-      id: "b_nothing",
-      name: "Nothing",
-      domains: ["nothing.tech"],
-      is_own: true,
-    },
-    topics: [{ id: "t_nothing_1", name: "Mid-range Android phones" }],
-    prompt_count: 19,
-    last_refreshed_at: now(),
-  },
+  topics: [
+    { id: "t_legora_1", name: "Comparisons & Alternatives" },
+    { id: "t_legora_2", name: "M&A & Due Diligence" },
+    { id: "t_legora_3", name: "BigLaw & Enterprise" },
+    { id: "t_legora_4", name: "EU & Compliance" },
+    { id: "t_legora_5", name: "Workflows & Office Integration" },
+  ],
+  prompt_count: 421,
+  last_refreshed_at: now(),
+  brand_stats: LEGORA_BRAND_STATS,
+  market_stats: LEGORA_MARKET_STATS,
+  total_chats: 12597,
 };
 
 // ----- actions seed -------------------------------------------------------
@@ -398,62 +333,11 @@ const LEGORA_ACTIONS: ActionOut[] = [
   },
 ];
 
-// Sparser sets for the other tracked companies — same shape, fewer entries.
-const SPARSE_ACTIONS = (companyId: string, name: string): ActionOut[] => [
-  {
-    id: `a_${companyId}_1`,
-    category: "owned_media",
-    kind: "article",
-    title: `How-to article: getting started with ${name}`,
-    rationale:
-      "Onboarding-intent prompts surface third-party walkthroughs instead of your own domain.",
-    opportunity: "high",
-    target: { format: "how-to article" },
-    suggested_agent: "article",
-  },
-  {
-    id: `a_${companyId}_2`,
-    category: "owned_media",
-    kind: "code",
-    title: `Add JSON-LD Product schema to ${name} landing pages`,
-    rationale:
-      "AI search engines favor pages with schema.org markup; current pages carry only Organization data.",
-    opportunity: "medium",
-    target: { schemas: ["Product"] },
-    suggested_agent: "code-pr",
-  },
-  {
-    id: `a_${companyId}_3`,
-    category: "earned_media",
-    kind: "editorial",
-    title: `Pitch a feature story about ${name} to industry press`,
-    rationale:
-      "Industry-trade publications dominate citations for category-defining searches.",
-    opportunity: "medium",
-    target: { format: "feature story" },
-    suggested_agent: null,
-  },
-];
-
-const ACTIONS: Record<CompanyKey, ActionOut[]> = {
-  legora: LEGORA_ACTIONS,
-  bmw: SPARSE_ACTIONS("bmw", "BMW"),
-  revolut: SPARSE_ACTIONS("revolut", "Revolut"),
-  mindspace: SPARSE_ACTIONS("mindspace", "Mindspace"),
-  "nothing-phone": SPARSE_ACTIONS("nothing", "Nothing Phone"),
-};
-
 // ----- matching ----------------------------------------------------------
 
-function matchKey(input: string): CompanyKey | null {
+function isLegora(input: string): boolean {
   const norm = input.trim().toLowerCase();
-  if (!norm) return null;
-  if (norm.includes("legora")) return "legora";
-  if (norm.includes("bmw")) return "bmw";
-  if (norm.includes("revolut")) return "revolut";
-  if (norm.includes("mindspace")) return "mindspace";
-  if (norm.includes("nothing")) return "nothing-phone";
-  return null;
+  return norm.includes("legora");
 }
 
 // ----- resolve stream ----------------------------------------------------
@@ -475,20 +359,19 @@ export function startResolve(
   };
 
   (async () => {
-    const key = matchKey(input);
-    if (!key) {
+    if (!isLegora(input)) {
       await sleep(550);
       if (cancelled) return;
       handlers.onError({
         code: "no_match",
         message:
-          "We don't track that company yet. Try one of the brands already configured in Peec.",
+          "Only Legora is configured in this demo. The real version uses Claude Agent SDK to crawl any brand site.",
         tracked: [...TRACKED_COMPANIES],
       });
       return;
     }
-    const company = COMPANIES[key];
-    const actions = ACTIONS[key];
+    const company = LEGORA;
+    const actions = LEGORA_ACTIONS;
 
     const events: ProgressEvent[] = [
       {
@@ -528,15 +411,11 @@ export function startResolve(
 // ----- company / actions accessors ---------------------------------------
 
 export function getCompany(companyId: string): CompanyOut | null {
-  return Object.values(COMPANIES).find((c) => c.id === companyId) ?? null;
+  return companyId === LEGORA.id ? LEGORA : null;
 }
 
 export function getActions(companyId: string): ActionOut[] {
-  const entry = Object.entries(COMPANIES).find(
-    ([, c]) => c.id === companyId,
-  ) as [CompanyKey, CompanyOut] | undefined;
-  if (!entry) return [];
-  return ACTIONS[entry[0]];
+  return companyId === LEGORA.id ? LEGORA_ACTIONS : [];
 }
 
 // ----- agent jobs --------------------------------------------------------

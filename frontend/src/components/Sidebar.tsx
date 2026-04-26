@@ -2,11 +2,14 @@ import { motion } from "motion/react";
 import {
   Activity,
   Building2,
+  Calendar,
   ChevronDown,
+  Code2,
+  FileText,
   Home,
-  Layers,
   Sparkles,
   Star,
+  Video,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -16,10 +19,13 @@ import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceView =
-  | "actions"
   | "overview"
+  | "actions"
+  | "studio-website"
+  | "studio-video"
+  | "studio-blog"
+  | "scheduler"
   | "brands"
-  | "domains"
   | "markets";
 
 type Props = {
@@ -141,17 +147,6 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-5">
-        <Section label="Actions">
-          <NavItem
-            icon={Sparkles}
-            label="Actions"
-            badge={pending}
-            dot={highPending > 0}
-            active={current === "actions"}
-            onClick={() => onChange("actions")}
-          />
-        </Section>
-
         <Section label="Insights">
           <NavItem
             icon={Home}
@@ -167,17 +162,52 @@ export default function Sidebar({
             onClick={() => onChange("brands")}
           />
           <NavItem
-            icon={Layers}
-            label="Domains"
-            active={current === "domains"}
-            onClick={() => onChange("domains")}
-          />
-          <NavItem
             icon={Activity}
             label="Markets"
             badge={company.market_stats?.length}
             active={current === "markets"}
             onClick={() => onChange("markets")}
+          />
+        </Section>
+
+        <Section label="Actions">
+          <NavItem
+            icon={Sparkles}
+            label="All actions"
+            badge={pending}
+            dot={highPending > 0}
+            active={current === "actions"}
+            onClick={() => onChange("actions")}
+          />
+        </Section>
+
+        <Section label="Studio">
+          <NavItem
+            icon={Code2}
+            label="Website"
+            active={current === "studio-website"}
+            onClick={() => onChange("studio-website")}
+          />
+          <NavItem
+            icon={Video}
+            label="Video"
+            active={current === "studio-video"}
+            onClick={() => onChange("studio-video")}
+          />
+          <NavItem
+            icon={FileText}
+            label="Blog post"
+            active={current === "studio-blog"}
+            onClick={() => onChange("studio-blog")}
+          />
+        </Section>
+
+        <Section label="Plan">
+          <NavItem
+            icon={Calendar}
+            label="Scheduler"
+            active={current === "scheduler"}
+            onClick={() => onChange("scheduler")}
           />
         </Section>
       </nav>

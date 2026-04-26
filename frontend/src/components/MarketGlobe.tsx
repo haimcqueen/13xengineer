@@ -18,21 +18,23 @@ type CountryFeature = {
   geometry: unknown;
 };
 
-/** Visibility → cool gradient: pale lavender → cobalt → bright blue. */
+/** Visibility → vibrant cobalt-blue gradient. Bigger jumps so the map reads
+ * as a heatmap, not a wash. Untracked countries fade to porcelain. */
 function visibilityFill(v: number): string {
-  if (v >= 0.30) return "rgba(30, 91, 201, 0.55)";
-  if (v >= 0.22) return "rgba(58, 124, 232, 0.45)";
-  if (v >= 0.16) return "rgba(110, 130, 200, 0.35)";
-  if (v >= 0.10) return "rgba(110, 101, 122, 0.25)";
-  return "rgba(174, 156, 168, 0.18)";
+  if (v >= 0.30) return "rgba(30, 91, 201, 0.92)"; // electric cobalt
+  if (v >= 0.22) return "rgba(58, 124, 232, 0.82)"; // bright blue
+  if (v >= 0.18) return "rgba(96, 154, 240, 0.70)"; // lighter blue
+  if (v >= 0.14) return "rgba(140, 170, 230, 0.55)"; // soft blue
+  if (v >= 0.10) return "rgba(165, 175, 210, 0.40)"; // pale blue
+  return "rgba(200, 192, 210, 0.22)"; // porcelain (active but tiny)
 }
 
 function visibilityPoint(v: number): string {
-  if (v >= 0.30) return "rgba(30, 91, 201, 0.95)";
-  if (v >= 0.22) return "rgba(58, 124, 232, 0.92)";
-  if (v >= 0.16) return "rgba(110, 130, 200, 0.85)";
-  if (v >= 0.10) return "rgba(110, 101, 122, 0.75)";
-  return "rgba(174, 156, 168, 0.6)";
+  if (v >= 0.30) return "rgba(30, 91, 201, 1)";
+  if (v >= 0.22) return "rgba(58, 124, 232, 1)";
+  if (v >= 0.16) return "rgba(96, 154, 240, 0.95)";
+  if (v >= 0.10) return "rgba(140, 170, 230, 0.85)";
+  return "rgba(174, 156, 168, 0.7)";
 }
 
 /** ISO-A2 country code → flag emoji. */
@@ -45,6 +47,14 @@ function flagEmoji(iso: string): string {
     .map((c) => String.fromCodePoint(A + c.charCodeAt(0) - 65))
     .join("");
 }
+
+// City coordinates of competitor citation hubs that we animate arcs FROM
+// (where competitor citations originate) INTO active markets we want to win.
+const COMPETITOR_HUBS: { lat: number; lng: number; name: string }[] = [
+  { lat: 40.7, lng: -74.0, name: "NYC" },
+  { lat: 37.77, lng: -122.42, name: "SF" },
+  { lat: 51.51, lng: -0.13, name: "London" },
+];
 
 export default function MarketGlobe({
   markets,
@@ -68,8 +78,6 @@ export default function MarketGlobe({
         const features = (data.features ?? []).filter(
           (f) => f.properties?.ISO_A2 !== "AQ",
         );
-        // eslint-disable-next-line no-console
-        console.log("[MarketGlobe] loaded", features.length, "country features");
         setCountries(features);
       })
       .catch((err) => {
@@ -90,10 +98,12 @@ export default function MarketGlobe({
     if (!ready || !ref.current) return;
     const controls = ref.current.controls();
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.32;
+    controls.autoRotateSpeed = 0.45; // slow but visible
     controls.enableZoom = false;
     controls.enablePan = false;
-    ref.current.pointOfView({ lat: 50, lng: 8, altitude: 2.4 }, 0);
+    // Start framed on Europe — most active markets cluster there.
+    // altitude 2.4 gives the atmosphere halo room to bloom around the edge.
+    ref.current.pointOfView({ lat: 30, lng: 8, altitude: 2.4 }, 0);
   }, [ready]);
 
   const marketByIso = useMemo(() => {
@@ -102,45 +112,68 @@ export default function MarketGlobe({
     return m;
   }, [markets]);
 
+  // Pulsing rings on every tracked market — bigger + more dramatic on the
+  // top markets, subtle everywhere else so the whole globe feels alive.
   const rings = useMemo(
     () =>
-      markets
-        .filter((m) => m.visibility >= 0.22)
-        .map((m) => ({
-          lat: m.lat,
-          lng: m.lng,
-          maxR: 3 + m.visibility * 10,
-          propagationSpeed: 1.8,
-          repeatPeriod: 1800,
-        })),
+      markets.map((m) => ({
+        lat: m.lat,
+        lng: m.lng,
+        maxR:
+          m.visibility >= 0.22
+            ? 5 + m.visibility * 22
+            : 1.8 + m.visibility * 12,
+        propagationSpeed: m.visibility >= 0.22 ? 2.2 : 1.4,
+        repeatPeriod: m.visibility >= 0.22 ? 1500 : 2400,
+        color:
+          m.visibility >= 0.22
+            ? "rgba(30,91,201,0.55)"
+            : "rgba(96,154,240,0.30)",
+      })),
     [markets],
   );
 
-  const arcs = useMemo(
-    () => [
-      {
-        startLat: 40.7,
-        startLng: -74.0, // NYC
-        endLat: 48.1,
-        endLng: 11.6, // Munich
-        color: ["rgba(110, 101, 122, 0.0)", "rgba(30, 91, 201, 0.55)"],
-      },
-      {
-        startLat: 37.77,
-        startLng: -122.42, // SF
-        endLat: 59.33,
-        endLng: 18.07, // Stockholm
-        color: ["rgba(110, 101, 122, 0.0)", "rgba(30, 91, 201, 0.55)"],
-      },
-      {
-        startLat: 51.51,
-        startLng: -0.13, // London
-        endLat: 52.52,
-        endLng: 13.4, // Berlin
-        color: ["rgba(110, 101, 122, 0.0)", "rgba(58, 124, 232, 0.45)"],
-      },
-    ],
-    [],
+  // Animated arcs from competitor hubs into our top tracked markets.
+  // Each arc is colored by the destination market's visibility band.
+  const arcs = useMemo(() => {
+    const top = [...markets]
+      .filter((m) => m.visibility >= 0.18)
+      .sort((a, b) => b.visibility - a.visibility)
+      .slice(0, 9);
+    const list: {
+      startLat: number;
+      startLng: number;
+      endLat: number;
+      endLng: number;
+      color: string[];
+    }[] = [];
+    top.forEach((m, i) => {
+      const hub = COMPETITOR_HUBS[i % COMPETITOR_HUBS.length];
+      const tone =
+        m.visibility >= 0.30
+          ? ["rgba(30,91,201,0.0)", "rgba(30,91,201,0.95)"]
+          : m.visibility >= 0.22
+            ? ["rgba(58,124,232,0.0)", "rgba(58,124,232,0.85)"]
+            : ["rgba(96,154,240,0.0)", "rgba(96,154,240,0.7)"];
+      list.push({
+        startLat: hub.lat,
+        startLng: hub.lng,
+        endLat: m.lat,
+        endLng: m.lng,
+        color: tone,
+      });
+    });
+    return list;
+  }, [markets]);
+
+  // Big bright HTML labels for top-tier markets — readable mid-rotation
+  const topMarkers = useMemo(
+    () =>
+      markets
+        .filter((m) => m.visibility >= 0.20)
+        .sort((a, b) => b.visibility - a.visibility)
+        .slice(0, 8),
+    [markets],
   );
 
   if (!ready) return <div style={{ width, height }} />;
@@ -151,46 +184,49 @@ export default function MarketGlobe({
       width={width}
       height={height}
       backgroundColor="rgba(0,0,0,0)"
-      // Solid color globe surface — soft warm rose so polygons stand out
+      // Globe surface — clean porcelain so the country-fill heat map pops.
+      // Slightly cool so it reads as cooler than the warm app background.
       globeImageUrl={null as unknown as string}
       globeMaterial={
         new THREE.MeshPhongMaterial({
-          color: 0xede2e7, // soft warm rose-tinted off-white
+          color: 0xf3eef3,
           transparent: true,
-          opacity: 0.95,
-          shininess: 6,
-          emissive: 0x1f1a28,
-          emissiveIntensity: 0.04,
+          opacity: 0.96,
+          shininess: 18,
+          specular: new THREE.Color(0xffffff),
+          emissive: 0x1c2748,
+          emissiveIntensity: 0.06,
         }) as unknown as THREE.Material
       }
+      // Bright, larger atmosphere — the "halo" that reads as wow
       showAtmosphere
-      atmosphereColor="#3A7CE8"
-      atmosphereAltitude={0.16}
-      // ===== Country polygons (solid fills, with hover lift) =====
+      atmosphereColor="#4D8FF0"
+      atmosphereAltitude={0.34}
+      // ===== Country polygons =====
       polygonsData={countries}
       polygonAltitude={(d: object) => {
         const iso = (d as CountryFeature).properties?.ISO_A2;
         const market = iso ? marketByIso.get(iso) : null;
-        const base = market ? 0.012 + market.visibility * 0.05 : 0.008;
-        return d === hoverD ? base + 0.045 : base;
+        const base = market ? 0.018 + market.visibility * 0.12 : 0.008;
+        return d === hoverD ? base + 0.06 : base;
       }}
       polygonCapColor={(d: object) => {
         const iso = (d as CountryFeature).properties?.ISO_A2;
         const market = iso ? marketByIso.get(iso) : null;
         if (d === hoverD) {
           return market
-            ? "rgba(30, 91, 201, 0.78)"
-            : "rgba(110, 130, 200, 0.42)";
+            ? "rgba(30, 91, 201, 0.96)"
+            : "rgba(110, 130, 200, 0.55)";
         }
         return market
           ? visibilityFill(market.visibility)
-          : "rgba(110, 101, 122, 0.10)";
+          : "rgba(170, 158, 178, 0.10)";
       }}
-      polygonSideColor={() => "rgba(31, 26, 40, 0.05)"}
+      polygonSideColor={() => "rgba(31, 26, 40, 0.06)"}
       polygonStrokeColor={(d: object) =>
-        d === hoverD ? "rgba(31, 26, 40, 0.4)" : "rgba(31, 26, 40, 0.10)"
+        d === hoverD ? "rgba(31, 26, 40, 0.45)" : "rgba(31, 26, 40, 0.10)"
       }
-      polygonsTransitionDuration={250}
+      polygonsTransitionDuration={300}
       onPolygonHover={(d: object | null) =>
         setHoverD((d as CountryFeature) ?? null)
       }
@@ -258,20 +294,20 @@ export default function MarketGlobe({
           </div>
         </div>`;
       }}
-      // ===== Marker dots on top of countries =====
+      // ===== Marker dots — taller spikes for top markets =====
       pointsData={markets}
       pointLat={(d: object) => (d as MarketStat).lat}
       pointLng={(d: object) => (d as MarketStat).lng}
-      pointAltitude={(d: object) =>
-        0.06 + (d as MarketStat).visibility * 0.45
-      }
+      pointAltitude={(d: object) => 0.04 + (d as MarketStat).visibility * 0.6}
       pointColor={(d: object) =>
         visibilityPoint((d as MarketStat).visibility)
       }
-      pointRadius={0.45}
-      pointResolution={6}
+      pointRadius={(d: object) =>
+        0.35 + (d as MarketStat).visibility * 0.6
+      }
+      pointResolution={8}
       pointsMerge={false}
-      // ===== Rings + arcs =====
+      // ===== Pulsing rings — every market =====
       ringsData={rings}
       ringLat={(d: object) => (d as { lat: number }).lat}
       ringLng={(d: object) => (d as { lng: number }).lng}
@@ -282,29 +318,55 @@ export default function MarketGlobe({
       ringRepeatPeriod={(d: object) =>
         (d as { repeatPeriod: number }).repeatPeriod
       }
-      ringColor={() => "rgba(30,91,201,0.45)"}
+      ringColor={(d: object) => (d as { color: string }).color}
+      // ===== Arcs — competitor hubs → tracked markets =====
       arcsData={arcs}
       arcStartLat={(d: object) => (d as { startLat: number }).startLat}
       arcStartLng={(d: object) => (d as { startLng: number }).startLng}
       arcEndLat={(d: object) => (d as { endLat: number }).endLat}
       arcEndLng={(d: object) => (d as { endLng: number }).endLng}
       arcColor={(d: object) => (d as { color: string[] }).color}
-      arcDashLength={0.35}
-      arcDashGap={0.1}
+      arcDashLength={0.42}
+      arcDashGap={0.18}
       arcDashAnimateTime={2400}
-      arcStroke={0.45}
-      arcAltitudeAutoScale={0.45}
-      labelsData={markets.filter((m) => m.visibility >= 0.20)}
-      labelLat={(d: object) => (d as MarketStat).lat}
-      labelLng={(d: object) => (d as MarketStat).lng}
-      labelText={(d: object) => (d as MarketStat).country_code}
-      labelSize={0.38}
-      labelDotRadius={0.16}
-      labelColor={() => "rgba(31, 26, 40, 0.78)"}
-      labelResolution={2}
-      labelAltitude={(d: object) =>
-        0.06 + (d as MarketStat).visibility * 0.45
+      arcStroke={0.55}
+      arcAltitudeAutoScale={0.55}
+      // ===== Top-market HTML labels (chips floating above the surface) =====
+      htmlElementsData={topMarkers}
+      htmlLat={(d: object) => (d as MarketStat).lat}
+      htmlLng={(d: object) => (d as MarketStat).lng}
+      htmlAltitude={(d: object) =>
+        0.05 + (d as MarketStat).visibility * 0.62
       }
+      htmlElement={(d: object) => {
+        const m = d as MarketStat;
+        const pct = Math.round(m.visibility * 100);
+        const flag = flagEmoji(m.country_code);
+        const el = document.createElement("div");
+        el.style.cssText = `
+          transform: translate(-50%, -100%);
+          pointer-events: none;
+          font-family: 'Geist Mono', ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          color: #1F1A28;
+          background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,242,247,0.90));
+          backdrop-filter: blur(14px) saturate(180%);
+          -webkit-backdrop-filter: blur(14px) saturate(180%);
+          padding: 4px 8px 4px 6px;
+          border-radius: 999px;
+          border: 1px solid rgba(31,26,40,0.08);
+          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          box-shadow: 0 8px 22px -10px rgba(30,91,201,0.32),
+                      0 1px 0 0 rgba(255,255,255,0.95) inset;
+          font-weight: 500;
+        `;
+        el.innerHTML = `<span style="font-size:11px;line-height:1;">${flag}</span><span style="color:#1E5BC9;font-weight:600;">${pct}%</span>`;
+        return el;
+      }}
     />
   );
 }

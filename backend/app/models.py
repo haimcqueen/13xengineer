@@ -34,6 +34,10 @@ class PeecSnapshot(Base):
     tags: Mapped[dict] = mapped_column(JSON)
     models: Mapped[dict] = mapped_column(JSON)
     mcp_actions_raw: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # /reports/* analytics — populated when the cold path runs.
+    brand_report: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    market_report: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    domain_report: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Action(Base):

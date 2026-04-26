@@ -20,6 +20,27 @@ class TopicOut(BaseModel):
     name: str
 
 
+class BrandStat(BaseModel):
+    brand_id: str
+    brand_name: str
+    visibility: float
+    share_of_voice: float
+    sentiment: float
+    position: float
+    mention_count: int
+    is_own: bool
+
+
+class MarketStat(BaseModel):
+    country_code: str
+    country_name: str
+    lat: float
+    lng: float
+    prompt_count: int
+    visibility: float
+    position: float
+
+
 class CompanyOut(BaseModel):
     id: str
     name: str
@@ -28,6 +49,9 @@ class CompanyOut(BaseModel):
     topics: list[TopicOut]
     prompt_count: int
     last_refreshed_at: datetime
+    brand_stats: list[BrandStat] = []
+    market_stats: list[MarketStat] = []
+    total_chats: int = 0
 
 
 ActionCategory = Literal["owned_media", "earned_media"]

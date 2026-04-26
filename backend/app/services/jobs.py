@@ -93,6 +93,9 @@ def mark_failed(
     db.commit()
 
 
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
 def run_in_background(
     coro_factory: Callable[[Session], Awaitable[Any]],
     job_id: str,
@@ -116,4 +119,9 @@ def run_in_background(
         finally:
             db.close()
 
-    return asyncio.create_task(runner())
+    # Hold a strong reference; asyncio only weakly tracks tasks, so without
+    # this the background task can be GC'd before it runs.
+    task = asyncio.create_task(runner())
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    return task

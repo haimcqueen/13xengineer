@@ -47,31 +47,51 @@ class PeecRestClient:
             self._client = None
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        return await self._request("GET", path, params=params)
+
+    async def _post(self, path: str, body: dict[str, Any]) -> Any:
+        return await self._request("POST", path, json_body=body)
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+    ) -> Any:
         assert self._client is not None, "Use 'async with PeecRestClient() as client'"
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
-                resp = await self._client.get(path, params=params)
+                resp = await self._client.request(
+                    method, path, params=params, json=json_body
+                )
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
                 last_exc = e
-                logger.warning("peec network error on %s (attempt %d): %s", path, attempt + 1, e)
+                logger.warning(
+                    "peec network error on %s %s (attempt %d): %s",
+                    method, path, attempt + 1, e,
+                )
                 await asyncio.sleep(0.5 * (2**attempt))
                 continue
 
             if resp.status_code in _NO_RETRY_STATUS:
                 raise PeecError(
-                    f"GET {path} -> {resp.status_code}: {resp.text[:200]}",
+                    f"{method} {path} -> {resp.status_code}: {resp.text[:200]}",
                     status_code=resp.status_code,
                 )
             if resp.status_code in _RETRY_STATUS:
-                logger.warning("peec %d on %s (attempt %d)", resp.status_code, path, attempt + 1)
+                logger.warning(
+                    "peec %d on %s %s (attempt %d)",
+                    resp.status_code, method, path, attempt + 1,
+                )
                 await asyncio.sleep(0.5 * (2**attempt))
                 continue
             resp.raise_for_status()
             return resp.json()
 
         raise PeecError(
-            f"GET {path} failed after 3 attempts: {last_exc}",
+            f"{method} {path} failed after 3 attempts: {last_exc}",
             status_code=None,
         )
 
@@ -93,3 +113,61 @@ class PeecRestClient:
 
     async def get_models(self, project_id: str) -> dict:
         return await self._get("/models", params={"project_id": project_id})
+
+    # ---- Reports (analytics) ----------------------------------------------
+
+    async def get_brand_report(
+        self,
+        project_id: str,
+        start_date: str,
+        end_date: str,
+        dimensions: list[str] | None = None,
+        filters: list[dict] | None = None,
+        limit: int = 50,
+    ) -> dict:
+        body: dict[str, Any] = {
+            "project_id": project_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "limit": limit,
+        }
+        if dimensions:
+            body["dimensions"] = dimensions
+        if filters:
+            body["filters"] = filters
+        return await self._post("/reports/brands", body)
+
+    async def get_domain_report(
+        self,
+        project_id: str,
+        start_date: str,
+        end_date: str,
+        limit: int = 30,
+        filters: list[dict] | None = None,
+    ) -> dict:
+        body: dict[str, Any] = {
+            "project_id": project_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "limit": limit,
+            "order_by": [{"field": "retrieval_count", "direction": "desc"}],
+        }
+        if filters:
+            body["filters"] = filters
+        return await self._post("/reports/domains", body)
+
+    async def get_url_report(
+        self,
+        project_id: str,
+        start_date: str,
+        end_date: str,
+        limit: int = 30,
+    ) -> dict:
+        body = {
+            "project_id": project_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "limit": limit,
+            "order_by": [{"field": "retrieval_count", "direction": "desc"}],
+        }
+        return await self._post("/reports/urls", body)

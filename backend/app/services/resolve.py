@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.services import peec_actions
 from app.services.company_match import MatchedProject, MatchFailure, resolve as match_resolve
 from app.services.peec_mcp import get_mcp_client
 from app.services.peec_rest import PeecError, PeecRestClient
+from app.services.site_intel import crawl_with_exa
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +60,20 @@ def find_fresh_company(db: Session, user_input: str) -> Company | None:
 async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
     """The cold-path resolve flow. Emits progress events into the job row.
 
-    Steps: match → fetch (parallel REST) → mcp actions → snapshot + actions.
+    Steps: exa-crawl → match → fetch (parallel REST) → mcp actions → snapshot + actions.
     Errors bubble up to run_in_background which marks the job failed.
     """
+
+    # Stage 0 — fetch the brand site via Exa so the resolve feels live.
+    # Failure here is non-fatal: the rest of the pipeline still runs.
+    async def emit(event_type: str, data: dict) -> None:
+        jobs_svc.append_event(db, job_id, event_type, data)
+
+    try:
+        await crawl_with_exa(user_input, on_event=emit)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("crawl_with_exa failed: %s", e)
+
     match = await match_resolve(user_input)
     if isinstance(match, MatchFailure):
         jobs_svc.append_event(
@@ -113,6 +125,11 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
         job_row.company_id = company.id
         db.commit()
 
+    # 30-day window for /reports/* analytics
+    today = datetime.now(timezone.utc).date()
+    end_date = today.isoformat()
+    start_date = (today - timedelta(days=30)).isoformat()
+
     async with PeecRestClient() as client:
 
         async def fetch_prompts():
@@ -149,9 +166,64 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
         async def fetch_models():
             return await client.get_models(match.project_id)
 
-        prompts, brands, topics, tags, models_payload = await asyncio.gather(
-            fetch_prompts(), fetch_brands(), fetch_topics(), fetch_tags(), fetch_models()
+        async def fetch_brand_report():
+            try:
+                return await client.get_brand_report(
+                    match.project_id, start_date=start_date, end_date=end_date, limit=20
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("brand_report fetch failed: %s", e)
+                return {"data": []}
+
+        async def fetch_domain_report():
+            try:
+                return await client.get_domain_report(
+                    match.project_id, start_date=start_date, end_date=end_date, limit=30
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("domain_report fetch failed: %s", e)
+                return {"data": []}
+
+        (
+            prompts,
+            brands,
+            topics,
+            tags,
+            models_payload,
+            brand_report,
+            domain_report,
+        ) = await asyncio.gather(
+            fetch_prompts(),
+            fetch_brands(),
+            fetch_topics(),
+            fetch_tags(),
+            fetch_models(),
+            fetch_brand_report(),
+            fetch_domain_report(),
         )
+
+        # Per-country breakdown for own brand → drives the globe + market view.
+        own_brand_id = next(
+            (b.get("id") for b in (brands or {}).get("data", []) if b.get("is_own")),
+            None,
+        )
+        market_report: dict = {"data": []}
+        if own_brand_id:
+            try:
+                market_report = await client.get_brand_report(
+                    match.project_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    dimensions=["country_code"],
+                    filters=[
+                        {"field": "brand_id", "operator": "in", "values": [own_brand_id]}
+                    ],
+                    limit=50,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("market_report fetch failed: %s", e)
+
+        jobs_svc.append_event(db, job_id, "reports_loaded", {})
 
     mcp = get_mcp_client()
     jobs_svc.append_event(db, job_id, "actions_pending", {})
@@ -171,6 +243,9 @@ async def resolve_pipeline(db: Session, job_id: str, user_input: str) -> None:
         tags=tags,
         models=models_payload,
         mcp_actions_raw={"actions": list(mcp_actions)} if mcp_actions else None,
+        brand_report=brand_report,
+        market_report=market_report,
+        domain_report=domain_report,
     )
     db.add(snapshot)
     db.flush()  # need snapshot.id for actions
