@@ -12,6 +12,12 @@ import {
 } from "lucide-react";
 
 import LGCard from "@/components/LGCard";
+import {
+  createDeliverable,
+  publishDeliverable,
+  scheduleDeliverable,
+  useDeliverableForAction,
+} from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +63,7 @@ const RENDER_STAGES: { label: string; hint: string; ms: number }[] = [
   },
 ];
 
-const VIDEO_SRC = "/videos/legora-tabular-review.mp4";
+const VIDEO_SRC = "/videos/jude_law.mp4";
 
 type RenderState =
   | { kind: "idle" }
@@ -80,6 +86,23 @@ export default function StudioVideo({ company, actions, completed }: Props) {
     if (stage >= RENDER_STAGES.length) {
       setState({ kind: "ready", action: state.action });
       setOverlayOpen(true);
+      // Land a Deliverable so it shows up in Scheduler & on the action card.
+      const own = company.own_brand?.name ?? company.name;
+      createDeliverable(state.action, {
+        type: "video",
+        title: state.action.title,
+        duration_seconds:
+          (state.action.target.duration_target_seconds as number) ?? 90,
+        video_url: VIDEO_SRC,
+        thumbnail_url: "",
+        storyboard: [
+          "Open on contract document on screen",
+          `Cut to ${own} interface — start review`,
+          "Highlight key clauses being flagged",
+          "Show timer · 4:32 elapsed",
+          "Closing VO + CTA card",
+        ],
+      });
       return;
     }
     const t = window.setTimeout(() => {
@@ -90,7 +113,7 @@ export default function StudioVideo({ company, actions, completed }: Props) {
       );
     }, RENDER_STAGES[stage].ms);
     return () => window.clearTimeout(t);
-  }, [state]);
+  }, [state, company]);
 
   const totalMs = RENDER_STAGES.reduce((acc, s) => acc + s.ms, 0);
   const elapsed = state.kind === "rendering" ? state.elapsed : state.kind === "ready" ? totalMs : 0;
@@ -327,25 +350,10 @@ export default function StudioVideo({ company, actions, completed }: Props) {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-3"
                     >
-                      <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
-                        <Check className="size-3.5" strokeWidth={3} />
-                        Render complete · 1080p
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setOverlayOpen(true)}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--blue)] px-3 py-2.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
-                      >
-                        <Play className="size-3.5" strokeWidth={2.5} />
-                        Open big preview
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/80 px-3 py-2.5 text-[12.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
-                      >
-                        <Calendar className="size-3.5" />
-                        Schedule release
-                      </button>
+                      <ReadyConsole
+                        action={state.action}
+                        onPreview={() => setOverlayOpen(true)}
+                      />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -514,6 +522,89 @@ function BigReveal({
           </div>
         </div>
       </motion.div>
+    </>
+  );
+}
+
+function ReadyConsole({
+  action,
+  onPreview,
+}: {
+  action: ActionOut;
+  onPreview: () => void;
+}) {
+  const deliverable = useDeliverableForAction(action.id);
+  const status = deliverable?.status ?? "draft";
+
+  function handleSchedule() {
+    if (!deliverable) return;
+    const when = new Date();
+    when.setDate(when.getDate() + 1);
+    when.setHours(10, 0, 0, 0);
+    scheduleDeliverable(deliverable.id, when);
+  }
+
+  function handlePublish() {
+    if (!deliverable) return;
+    publishDeliverable(deliverable.id, "LinkedIn");
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
+        <Check className="size-3.5" strokeWidth={3} />
+        Render complete · 1080p
+      </div>
+      <button
+        type="button"
+        onClick={onPreview}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--blue)] px-3 py-2.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
+      >
+        <Play className="size-3.5" strokeWidth={2.5} />
+        Open big preview
+      </button>
+      {status === "draft" && (
+        <>
+          <button
+            type="button"
+            onClick={handleSchedule}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/80 px-3 py-2.5 text-[12.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
+          >
+            <Calendar className="size-3.5" />
+            Schedule release
+          </button>
+          <button
+            type="button"
+            onClick={handlePublish}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-white/80 px-3 py-2.5 text-[12.5px] font-medium text-rose transition-colors hover:border-[var(--border-strong)]"
+          >
+            <Sparkles className="size-3.5" />
+            Publish to social
+          </button>
+        </>
+      )}
+      {status === "scheduled" && (
+        <div className="rounded-[var(--radius-md)] border border-[rgba(30,91,201,0.25)] bg-[rgba(30,91,201,0.06)] px-3 py-2.5 text-[12px] text-[var(--blue)]">
+          <div className="flex items-center gap-2 font-medium">
+            <Calendar className="size-3.5" />
+            Scheduled
+          </div>
+          <div className="mt-0.5 font-mono text-[11px]">
+            {deliverable?.scheduled_at &&
+              new Date(deliverable.scheduled_at).toLocaleString("en-US", {
+                weekday: "short",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+          </div>
+        </div>
+      )}
+      {status === "published" && (
+        <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-[12.5px] text-emerald-800">
+          <Check className="size-3.5" strokeWidth={3} />
+          Published · {deliverable?.destination ?? "live"}
+        </div>
+      )}
     </>
   );
 }

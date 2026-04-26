@@ -15,6 +15,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import FelixMark from "@/components/FelixMark";
+import { useDeliverables } from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -104,11 +105,20 @@ export default function Sidebar({
   onChange,
   onReset,
 }: Props) {
-  const pending = actions.filter((a) => !completed.has(a.id)).length;
+  const deliverables = useDeliverables();
+  const handled = new Set<string>([
+    ...completed,
+    ...deliverables.map((d) => d.action_id),
+  ]);
+  const pending = actions.filter((a) => !handled.has(a.id)).length;
   const highPending = actions.filter(
-    (a) => !completed.has(a.id) && a.opportunity === "high",
+    (a) => !handled.has(a.id) && a.opportunity === "high",
   ).length;
   const brandCount = company.brand_stats?.length ?? 0;
+  const draftCount = deliverables.filter((d) => d.status === "draft").length;
+  const scheduledCount = deliverables.filter(
+    (d) => d.status === "scheduled",
+  ).length;
 
   return (
     <aside className="flex h-svh w-[260px] flex-col border-r border-[var(--border)] bg-[var(--ink)]/55 backdrop-blur-xl">
@@ -206,6 +216,8 @@ export default function Sidebar({
           <NavItem
             icon={Calendar}
             label="Scheduler"
+            badge={draftCount + scheduledCount}
+            dot={draftCount > 0}
             active={current === "scheduler"}
             onClick={() => onChange("scheduler")}
           />

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import LGCard from "@/components/LGCard";
+import { createDeliverable } from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -48,13 +49,23 @@ export default function StudioWebsite({ company, actions, completed }: Props) {
     const tick = () => {
       i += 1;
       if (i >= STAGES.length) {
-        const slug = action.id.split("_").pop()?.slice(0, 6) ?? "abc";
-        setState({
-          kind: "done",
-          action,
-          prUrl: `https://github.com/${repoSlug}/pull/${42 + (Math.abs(hashCode(action.id)) % 90)}`,
+        const prUrl = `https://github.com/${repoSlug}/pull/${42 + (Math.abs(hashCode(action.id)) % 90)}`;
+        setState({ kind: "done", action, prUrl });
+        // Land a Deliverable so the action card + scheduler reflect this PR.
+        const schemas = (action.target.schemas as string[] | undefined) ?? [
+          "Organization",
+          "FAQPage",
+        ];
+        createDeliverable(action, {
+          type: "code-pr",
+          title: action.title,
+          repo: repoSlug,
+          branch: `felix/${action.id.split("_").slice(-1)[0]?.slice(0, 6) ?? "abc"}`,
+          pr_url: prUrl,
+          files_changed: ["app/layout.tsx", "app/seo.ts"],
+          diff_preview: "+ structured data added",
+          schemas_added: schemas,
         });
-        void slug;
         return;
       }
       setState({ kind: "running", action, stage: i });

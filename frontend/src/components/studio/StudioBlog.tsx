@@ -7,12 +7,17 @@ import {
   ExternalLink,
   FileText,
   Loader2,
-  Play,
   Sparkles,
 } from "lucide-react";
 import Markdown from "react-markdown";
 
 import LGCard from "@/components/LGCard";
+import {
+  createDeliverable,
+  publishDeliverable,
+  scheduleDeliverable,
+  useDeliverableForAction,
+} from "@/lib/deliverables";
 import type { ActionOut, CompanyOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -49,10 +54,18 @@ export default function StudioBlog({ company, actions, completed }: Props) {
   useEffect(() => {
     if (state.kind !== "drafting") return;
     if (state.stage >= PIPELINE.length) {
+      const markdown = buildArticle(state.action, company);
       setState({
         kind: "ready",
         action: state.action,
-        markdown: buildArticle(state.action, company),
+        markdown,
+      });
+      // Land a Deliverable so it shows up in Scheduler & on the action card.
+      createDeliverable(state.action, {
+        type: "article",
+        title: state.action.title,
+        markdown,
+        word_count_estimate: 1800,
       });
       return;
     }
@@ -276,49 +289,13 @@ export default function StudioBlog({ company, actions, completed }: Props) {
                   </motion.div>
                 )}
                 {state.kind === "ready" && (
-                  <motion.div
+                  <ReadyEditor
                     key="ready"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col"
-                  >
-                    <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3.5">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                        Draft · ready
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={copyMarkdown}
-                          className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/80 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:bg-white"
-                        >
-                          {copied ? (
-                            <Check className="size-3" strokeWidth={3} />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                          {copied ? "Copied" : "Copy"}
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/80 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:bg-white"
-                        >
-                          <Calendar className="size-3" />
-                          Schedule
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--blue)] px-3 py-1.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90"
-                        >
-                          <ExternalLink className="size-3" />
-                          Post to blog
-                        </button>
-                      </div>
-                    </div>
-                    <div className="prose prose-sm max-h-[60vh] max-w-none overflow-y-auto px-7 py-6 text-rose/90 prose-headings:text-rose prose-headings:font-medium prose-h1:text-2xl prose-h2:text-lg prose-h3:text-base prose-p:text-[13.5px] prose-p:leading-relaxed prose-li:text-[13px] prose-a:text-[var(--blue)]">
-                      <Markdown>{state.markdown}</Markdown>
-                    </div>
-                  </motion.div>
+                    action={state.action}
+                    markdown={state.markdown}
+                    copied={copied}
+                    onCopy={copyMarkdown}
+                  />
                 )}
               </AnimatePresence>
             </div>
@@ -330,6 +307,98 @@ export default function StudioBlog({ company, actions, completed }: Props) {
 }
 
 // ----------------------------------------------------------------------------
+
+function ReadyEditor({
+  action,
+  markdown,
+  copied,
+  onCopy,
+}: {
+  action: ActionOut;
+  markdown: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const deliverable = useDeliverableForAction(action.id);
+  const status = deliverable?.status ?? "draft";
+
+  function handleSchedule() {
+    if (!deliverable) return;
+    const when = new Date();
+    when.setDate(when.getDate() + 1);
+    when.setHours(10, 0, 0, 0);
+    scheduleDeliverable(deliverable.id, when);
+  }
+
+  function handlePublish() {
+    if (!deliverable) return;
+    publishDeliverable(deliverable.id, "Blog");
+  }
+
+  const statusBadge =
+    status === "scheduled" ? (
+      <span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-[rgba(30,91,201,0.10)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--blue)]">
+        <Calendar className="size-2.5" />
+        Scheduled
+      </span>
+    ) : status === "published" ? (
+      <span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-emerald-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-700">
+        <Check className="size-2.5" />
+        Live
+      </span>
+    ) : (
+      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+        Draft · ready
+      </span>
+    );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3.5">
+        {statusBadge}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onCopy}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/80 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:bg-white"
+          >
+            {copied ? (
+              <Check className="size-3" strokeWidth={3} />
+            ) : (
+              <Copy className="size-3" />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSchedule}
+            disabled={status === "scheduled" || status === "published"}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--border)] bg-white/80 px-3 py-1.5 text-[11.5px] font-medium text-rose transition-colors hover:bg-white disabled:opacity-40"
+          >
+            <Calendar className="size-3" />
+            {status === "scheduled" ? "Scheduled" : "Schedule"}
+          </button>
+          <button
+            type="button"
+            onClick={handlePublish}
+            disabled={status === "published"}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--blue)] px-3 py-1.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            <ExternalLink className="size-3" />
+            {status === "published" ? "Published" : "Post to blog"}
+          </button>
+        </div>
+      </div>
+      <div className="prose prose-sm max-h-[60vh] max-w-none overflow-y-auto px-7 py-6 text-rose/90 prose-headings:text-rose prose-headings:font-medium prose-h1:text-2xl prose-h2:text-lg prose-h3:text-base prose-p:text-[13.5px] prose-p:leading-relaxed prose-li:text-[13px] prose-a:text-[var(--blue)]">
+        <Markdown>{markdown}</Markdown>
+      </div>
+    </motion.div>
+  );
+}
 
 function Header({
   eyebrow,

@@ -104,6 +104,18 @@ export default function MarketGlobe({
     // Start framed on Europe — most active markets cluster there.
     // altitude 2.4 gives the atmosphere halo room to bloom around the edge.
     ref.current.pointOfView({ lat: 30, lng: 8, altitude: 2.4 }, 0);
+
+    // Cap GPU work: clamp pixel ratio (retina ~2-3 → 1.5) and disable
+    // auto-rotate when the tab is hidden.
+    const renderer = ref.current.renderer?.();
+    if (renderer && typeof renderer.setPixelRatio === "function") {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    }
+    const onVis = () => {
+      controls.autoRotate = !document.hidden;
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [ready]);
 
   const marketByIso = useMemo(() => {
@@ -112,24 +124,28 @@ export default function MarketGlobe({
     return m;
   }, [markets]);
 
-  // Pulsing rings on every tracked market — bigger + more dramatic on the
-  // top markets, subtle everywhere else so the whole globe feels alive.
+  // Pulsing rings — only on markets that visually matter. Each ring is a
+  // continuous shader animation, so capping the count is a real GPU saving.
   const rings = useMemo(
     () =>
-      markets.map((m) => ({
-        lat: m.lat,
-        lng: m.lng,
-        maxR:
-          m.visibility >= 0.22
-            ? 5 + m.visibility * 22
-            : 1.8 + m.visibility * 12,
-        propagationSpeed: m.visibility >= 0.22 ? 2.2 : 1.4,
-        repeatPeriod: m.visibility >= 0.22 ? 1500 : 2400,
-        color:
-          m.visibility >= 0.22
-            ? "rgba(30,91,201,0.55)"
-            : "rgba(96,154,240,0.30)",
-      })),
+      [...markets]
+        .filter((m) => m.visibility >= 0.14)
+        .sort((a, b) => b.visibility - a.visibility)
+        .slice(0, 8)
+        .map((m) => ({
+          lat: m.lat,
+          lng: m.lng,
+          maxR:
+            m.visibility >= 0.22
+              ? 5 + m.visibility * 22
+              : 1.8 + m.visibility * 12,
+          propagationSpeed: m.visibility >= 0.22 ? 2.2 : 1.4,
+          repeatPeriod: m.visibility >= 0.22 ? 1500 : 2400,
+          color:
+            m.visibility >= 0.22
+              ? "rgba(30,91,201,0.55)"
+              : "rgba(96,154,240,0.30)",
+        })),
     [markets],
   );
 
@@ -139,7 +155,7 @@ export default function MarketGlobe({
     const top = [...markets]
       .filter((m) => m.visibility >= 0.18)
       .sort((a, b) => b.visibility - a.visibility)
-      .slice(0, 9);
+      .slice(0, 5);
     const list: {
       startLat: number;
       startLng: number;

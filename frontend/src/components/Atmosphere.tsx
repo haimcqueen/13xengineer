@@ -7,7 +7,6 @@ export default function Atmosphere() {
       <div className="blob blob-a" />
       <div className="blob blob-b" />
       <div className="blob blob-c" />
-      <div className="blob blob-d" />
       {/* Faint gridline for editorial rhythm */}
       <svg
         className="absolute inset-0 h-full w-full opacity-[0.04]"

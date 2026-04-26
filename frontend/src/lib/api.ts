@@ -134,6 +134,102 @@ export function getActions(companyId: string): Promise<ActionOut[]> {
   return api<ActionOut[]>(`/api/companies/${companyId}/actions`);
 }
 
+// ---- Repo config + agent runs --------------------------------------------
+
+export type RepoConfigIn = {
+  site_url: string;
+  repo_url: string;
+  default_branch: string;
+  github_token: string;
+};
+
+export type RepoConfigOut = {
+  company_id: string;
+  site_url: string;
+  repo_url: string;
+  default_branch: string;
+  has_token: boolean;
+};
+
+export function putRepoConfig(
+  companyId: string,
+  body: RepoConfigIn,
+): Promise<RepoConfigOut> {
+  return api<RepoConfigOut>(`/api/companies/${companyId}/repo`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getRepoConfig(
+  companyId: string,
+): Promise<RepoConfigOut | null> {
+  try {
+    return await api<RepoConfigOut>(`/api/companies/${companyId}/repo`);
+  } catch (e) {
+    if (e instanceof Error && /\b404\b/.test(e.message)) return null;
+    throw e;
+  }
+}
+
+export type AgentKindServer = "article" | "video" | "code-pr" | "improvement";
+
+export function runAgent(
+  kind: AgentKindServer,
+  body: { action_id: string; improvement_job_id?: string },
+): Promise<{ job_id: string }> {
+  return api<{ job_id: string }>(`/api/agents/${kind}/run`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function getJob(jobId: string): Promise<JobOut> {
+  return api<JobOut>(`/api/jobs/${jobId}`);
+}
+
+export type PollHandlers = {
+  onEvent?: (e: ProgressEvent) => void;
+  onDone: (job: JobOut) => void;
+  onError: (message: string, code?: string) => void;
+};
+
+/** Poll a job until terminal. Returns a cancel function. */
+export function pollJob(jobId: string, handlers: PollHandlers): () => void {
+  let cancelled = false;
+  (async () => {
+    let sent = 0;
+    while (!cancelled) {
+      let job: JobOut;
+      try {
+        job = await getJob(jobId);
+      } catch (e) {
+        if (cancelled) return;
+        handlers.onError(e instanceof Error ? e.message : "poll failed");
+        return;
+      }
+      const fresh = job.progress.slice(sent);
+      sent = job.progress.length;
+      for (const e of fresh) handlers.onEvent?.(e);
+      if (job.status === "done") {
+        handlers.onDone(job);
+        return;
+      }
+      if (job.status === "failed") {
+        handlers.onError(
+          job.error ?? "Job failed",
+          job.error_code ?? undefined,
+        );
+        return;
+      }
+      await sleep(800);
+    }
+  })();
+  return () => {
+    cancelled = true;
+  };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
